@@ -4,6 +4,7 @@ project(SignatureProject)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
+find_package(OpenSSL REQUIRED)
 
 if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-fcommon)
@@ -30,3 +31,4 @@ target_compile_options(cases_test PRIVATE -mavx2)
 
 
 target_link_libraries(cases_test PRIVATE sha3)
+target_link_libraries(cases_test PRIVATE OpenSSL::Crypto)

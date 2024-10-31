@@ -36,12 +36,10 @@ static
     if (!sd0_bot) {
         prg(sd, iv, R(0, 0), lambda, outLenBytes);
     }
-
     // Step: 3..4
     for (unsigned int i = 1; i < num_instances; i++) {
         prg(sd + (lambda_bytes * i), iv, R(0, i), lambda, outLenBytes);
     }
-
     // Step: 5..9
     memset(v, 0, depth * outLenBytes);
     for (unsigned int j = 0; j < depth; j++) {

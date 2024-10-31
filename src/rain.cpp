@@ -7,13 +7,13 @@ bool rain(const std::vector<uint8_t> &key_in,
           std::vector<uint8_t> &ciphertext_out, uint8_t *witness, bool flag) {
     ciphertext_out.resize(BLOCK_SIZE);
 
-    field::GF2_256 key, state;
+    field::GF2_128 key, state;
     key.from_bytes(key_in.data());
     state.from_bytes(plaintext_in.data());
 
     if (flag && witness) {
         key.to_bytes(witness);
-        witness += 32UL;
+        witness += 16UL;
     }
     // first r-1 rounds
     for (size_t r = 0; r < NUM_SBOXES - 1; r++) {
@@ -24,7 +24,7 @@ bool rain(const std::vector<uint8_t> &key_in,
         // get the w_state
         if (flag && witness) {
             state.to_bytes(witness);
-            witness += 32UL;
+            witness += 16UL;
         }
         // transposed matrix multiplication is faster, so we use that instead
         // standard multiplication can be useful for debugging, set
@@ -47,9 +47,9 @@ bool rain(const std::vector<uint8_t> &key_in,
     return true;
 }
 
-bool rain(const field::GF2_256 &key_in, const field::GF2_256 &plaintext_in,
-          field::GF2_256 &ciphertext_out, uint8_t *witness, bool flag) {
-    field::GF2_256 key, state;
+bool rain(const field::GF2_128 &key_in, const field::GF2_128 &plaintext_in,
+          field::GF2_128 &ciphertext_out, uint8_t *witness, bool flag) {
+    field::GF2_128 key, state;
     key = key_in;
     state = plaintext_in;
 
@@ -62,7 +62,7 @@ bool rain(const field::GF2_256 &key_in, const field::GF2_256 &plaintext_in,
         // get the w_state
         if (flag && witness) {
             state.to_bytes(witness);
-            witness += 32UL;
+            witness += 16UL;
         }
         // transposed matrix multiplication is faster, so we use that instead
         // standard multiplication can be useful for debugging, set

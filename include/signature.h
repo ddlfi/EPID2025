@@ -16,25 +16,24 @@ struct signature_t {
     std::vector<uint8_t*> pdec;
     std::vector<uint8_t*> com;
 
-
     // /////for debug
 
     // std::vector<u_int8_t> chall_2;
-    // std::vector<field::GF2_256> A_0;
-    // std::vector<field::GF2_256> A_1;
+    // std::vector<field::GF2_128> A_0;
+    // std::vector<field::GF2_128> A_1;
 
     // std::vector<uint8_t> witness;
-    // std::vector<field::GF2_256> v_combined;
-    
-    // std::vector<field::GF2_256> v_field;
+    // std::vector<field::GF2_128> v_combined;
+
+    // std::vector<field::GF2_128> v_field;
 };
 
 class Signature {
    public:
     int key_num_;
     int tree_node_num_;
-    const int lambda_ = 256;
-    const int lambda_bytes_ = 32;
+    const int lambda_ = 128;
+    const int lambda_bytes_ = 16;
     const int iv_size_ = 16;
 
    public:
@@ -47,12 +46,12 @@ class Signature {
         gen_skey();
         gen_pkey();
         gen_tree();
-        params_.lambda = 256;
-        params_.k1 = 4;
-        params_.k0 = 4;
+        params_.lambda = 128;
+        params_.k1 = 8;
+        params_.k0 = 8;
         params_.tau0 = 0;
-        params_.tau1 = 64;
-        params_.tau = 64;
+        params_.tau1 = 16;
+        params_.tau = 16;
     }
     void sign(const uint8_t signer_index, const std::vector<uint8_t>& msg,
               signature_t* sig);
@@ -90,9 +89,9 @@ class Signature {
                           const std::vector<uint8_t>& b_tilde,
                           unsigned int lambda);
 
-    field::GF2_256 zk_hash(const std::vector<uint8_t>& sd,
-                           const std::vector<field::GF2_256>& x_0,
-                           field::GF2_256& x_1);
+    field::GF2_128 zk_hash(const std::vector<uint8_t>& sd,
+                           const std::vector<field::GF2_128>& x_0,
+                           field::GF2_128& x_1);
 
     void gen_rootkey_iv(const std::vector<uint8_t>& mu,
                         const uint8_t signer_index,
@@ -102,19 +101,16 @@ class Signature {
     void gen_witness(uint8_t* witness, uint8_t index);
 
    private:
-    const std::vector<uint8_t> rain_msg_ = {
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const std::vector<uint8_t> rain_msg_ = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x00, 0x00, 0x00};
 
-    const std::vector<uint8_t> s_0_ = {
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    const std::vector<uint8_t> s_1_ = {
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const std::vector<uint8_t> s_0_ = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00};
+    const std::vector<uint8_t> s_1_ = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00};
 
     std::vector<std::vector<uint8_t>> skey_;
 

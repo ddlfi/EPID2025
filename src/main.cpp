@@ -22,7 +22,7 @@ void test_case(unsigned int member_num, unsigned int signer_index,
 }
 
 int main() {
-    gen_field_base(field_base);
+    gen_field_base_128(field_base_128);
     std::vector<uint8_t> msg = {0x11, 0x22};
 
     test_case(8U, 0U, msg);

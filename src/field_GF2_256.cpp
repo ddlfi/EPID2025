@@ -470,7 +470,7 @@ void gen_field_base(std::vector<field::GF2_256> &field_base) {
 }
 
 field::GF2_256 combine_bf256_vec(field::GF2_256 *bf256_vec) {
-    uint64_t zero = 0;
+     uint64_t zero = 0;
     field::GF2_256 result(zero);
     for (int i = 0; i < 32; i++) {
         for (int j = 7; j >= 0; j--) {
