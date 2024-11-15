@@ -140,7 +140,7 @@ field::GF2_128 Signature::zk_hash(const std::vector<uint8_t>& sd,
     s.from_bytes(sd.data() + lambda_bytes_ * 2);
 
     uint64_t tmp;
-    memcpy(&tmp, sd.data() + lambda_bytes_*3, 8UL);
+    memcpy(&tmp, sd.data() + lambda_bytes_ * 3, 8UL);
     field::GF2_128 t(tmp);
     field::GF2_128 s_muti = s;
     field::GF2_128 t_muti = t;
@@ -167,7 +167,8 @@ void Signature::gen_rootkey_iv(const std::vector<uint8_t>& mu,
 void Signature::gen_witness(uint8_t* witness, unsigned int index) {
     std::vector<uint8_t> tmp;
     rain(skey_[index], rain_msg_, tmp, witness, 1);
-    witness += 3 * lambda_bytes_;  // 最后一个witness和下一次hash重叠了，因此+3而非4
+    witness +=
+        3 * lambda_bytes_;  // 最后一个witness和下一次hash重叠了，因此+3而非4
     index = index + key_num_;
     while (index != 1) {
         if (index % 2) {
@@ -182,15 +183,15 @@ void Signature::gen_witness(uint8_t* witness, unsigned int index) {
     }
 }
 
-void Signature::sign(unsigned int signer_index,
-                     const std::vector<uint8_t>& msg, signature_t* sig) {
+void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
+                     signature_t* sig) {
     const unsigned int ell = (4 + 6 * log2(key_num_)) * lambda_;
     const unsigned int muti_times = 3 + 4 * log2(key_num_);
     const unsigned int ell_bytes = ell / 8;
     const unsigned int ell_hat = ell + lambda_ * 2 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    // auto start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> mu(2 * lambda_bytes_);
     hash_pk_msg(msg, mu);
@@ -252,7 +253,7 @@ void Signature::sign(unsigned int signer_index,
     hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d, lambda_, ell);
 
     std::vector<field::GF2_128> v_gf_128_vec(ell_hat);
-    std::vector<field::GF2_128> v_combined_gf_128_vec(ell_hat / lambda_); 
+    std::vector<field::GF2_128> v_combined_gf_128_vec(ell_hat / lambda_);
     convert_vec_to_field(V.data(), v_gf_128_vec.data(), ell_hat, lambda_);
     gen_combined_field_vec(v_gf_128_vec.data(), v_combined_gf_128_vec.data(),
                            ell_hat);
@@ -302,14 +303,14 @@ void Signature::sign(unsigned int signer_index,
 
     auto end_time = std::chrono::high_resolution_clock::now();
 
-    auto total_time = end_time - start_time;
+    // auto total_time = end_time - start_time;
     auto vole_time = vole_commit_end_time - vole_commit_start_time;
-    auto sign_time = total_time - vole_time;
 
-    std::cout << "sign total time is : "
-              << std::chrono::duration<double, std::milli>(total_time).count()
-              << " ms" << std::endl;
-    std::cout << "sign vole commit time is : "
+    // std::cout << "sign total time is : "
+    //           << std::chrono::duration<double,
+    //           std::milli>(total_time).count()
+    //           << " ms" << std::endl;
+    std::cout << "vole commit time is : "
               << std::chrono::duration<double, std::milli>(vole_time).count()
               << " ms" << std::endl;
     delete V[0];
@@ -323,7 +324,7 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     const unsigned int ell_hat = ell + lambda_ * 2 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    // auto start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> mu(2 * lambda_bytes_);
     hash_pk_msg(msg, mu);
@@ -449,15 +450,16 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     hash_challenge_3(chall_3, chall_2, sig->A_1_tilde_bytes, A_0_tilde_bytes,
                      lambda_);
 
-    auto end_time = std::chrono::high_resolution_clock::now();
+    // auto end_time = std::chrono::high_resolution_clock::now();
 
-    auto total_time = end_time - start_time;
+    // auto total_time = end_time - start_time;
     auto vole_time = vole_reconstruct_end_time - vole_reconstruct_start_time;
 
-    std::cout << "verify total time is : "
-              << std::chrono::duration<double, std::milli>(total_time).count()
-              << " ms" << std::endl;
-    std::cout << "verify vole reconstruct time is : "
+    // std::cout << "verify total time is : "
+    //           << std::chrono::duration<double,
+    //           std::milli>(total_time).count()
+    //           << " ms" << std::endl;
+    std::cout << "vole reconstruct time is : "
               << std::chrono::duration<double, std::milli>(vole_time).count()
               << " ms" << std::endl;
 

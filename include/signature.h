@@ -45,7 +45,6 @@ class Signature {
         tree_node_num_ = 2 * key_num;
         gen_skey();
         gen_pkey();
-        gen_tree();
         params_.lambda = 128;
         params_.k1 = 8;
         params_.k0 = 8;
@@ -57,10 +56,10 @@ class Signature {
               signature_t* sig);
     bool verify(const std::vector<uint8_t>& msg, const signature_t* sig);
 
+    void gen_tree();
+
    private:
     void gen_pkey();
-
-    void gen_tree();
 
     void gen_skey();
 
