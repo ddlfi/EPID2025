@@ -164,7 +164,7 @@ void Signature::gen_rootkey_iv(const std::vector<uint8_t>& mu,
     H3_final(&h3_ctx, rootkey.data(), lambda_bytes_, iv.data());
 }
 
-void Signature::gen_witness(uint8_t* witness, uint8_t index) {
+void Signature::gen_witness(uint8_t* witness, unsigned int index) {
     std::vector<uint8_t> tmp;
     rain(skey_[index], rain_msg_, tmp, witness, 1);
     witness += 3 * lambda_bytes_;  // 最后一个witness和下一次hash重叠了，因此+3而非4
@@ -182,7 +182,7 @@ void Signature::gen_witness(uint8_t* witness, uint8_t index) {
     }
 }
 
-void Signature::sign(const uint8_t signer_index,
+void Signature::sign(unsigned int signer_index,
                      const std::vector<uint8_t>& msg, signature_t* sig) {
     const unsigned int ell = (4 + 6 * log2(key_num_)) * lambda_;
     const unsigned int muti_times = 3 + 4 * log2(key_num_);

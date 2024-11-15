@@ -53,7 +53,7 @@ class Signature {
         params_.tau1 = 16;
         params_.tau = 16;
     }
-    void sign(const uint8_t signer_index, const std::vector<uint8_t>& msg,
+    void sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
               signature_t* sig);
     bool verify(const std::vector<uint8_t>& msg, const signature_t* sig);
 
@@ -98,7 +98,7 @@ class Signature {
                         std::vector<uint8_t>& rootkey,
                         std::vector<uint8_t>& iv);
 
-    void gen_witness(uint8_t* witness, uint8_t index);
+    void gen_witness(uint8_t* witness, unsigned int index);
 
    private:
     const std::vector<uint8_t> rain_msg_ = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

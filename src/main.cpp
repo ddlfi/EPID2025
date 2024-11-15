@@ -30,4 +30,9 @@ int main() {
     test_case(32U, 16U, msg);
     test_case(64U, 32U, msg);
     test_case(128U, 64U, msg);
+    test_case(256U, 128U, msg);
+    test_case(512U, 256U, msg);
+    test_case(1024U, 512U, msg);
+    test_case(2048U, 1024U, msg);
+    test_case(4096U, 2048U, msg);
 }
