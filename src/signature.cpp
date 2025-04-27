@@ -1,108 +1,33 @@
 #include "signature.h"
-
+#include <random>
 #include <chrono>
 #include <cmath>
-#include <random>
 
-void Signature::gen_skey() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<uint8_t> dis(0, 255);
 
-    for (auto& skey_i : skey_) {
-        for (auto& value : skey_i) {
-            value = dis(gen);
-        }
-    }
-}
-
-void Signature::gen_pkey() {
-    for (auto i = 0; i < key_num_; i++) {
-        rain(skey_[i], rain_msg_, pkey_[i], nullptr, 0);
-    }
-}
-
-void Signature::gen_tree() {
-    for (int i = key_num_; i < tree_node_num_; i++) {
-        tree_[i] = pkey_[i - key_num_];
-    }
-    int index = key_num_ - 1;
-    while (index != 0) {
-        hash_1(tree_[2 * index], tree_[2 * index + 1], s_0_, tree_[index],
-               nullptr, 0);
-        index--;
-    }
-}
-
-void Signature::hash_1(const std::vector<uint8_t>& input_0,
-                       const std::vector<uint8_t>& input_1,
-                       const std::vector<uint8_t>& s_byte,
-                       std::vector<uint8_t>& output, uint8_t* witness,
-                       bool flag) {
-    if (flag && witness) {
-        memcpy(witness, input_0.data(), lambda_bytes_);
-        memcpy(witness + lambda_bytes_, input_1.data(), lambda_bytes_);
-        memcpy(witness + lambda_bytes_ * 2, s_byte.data(), lambda_bytes_);
-        witness += lambda_bytes_ * 3;
-    }
-    field::GF2_128 i_0, i_1, s, s_, key, msg, rain_output, result;
-
-    i_0.from_bytes(input_0.data());
-    i_1.from_bytes(input_1.data());
-    s.from_bytes(s_byte.data());
-    s_ = (i_0 + i_1) * s;
-    if (flag && witness) {
-        s_.to_bytes(witness);
-        witness += lambda_bytes_;
-    }
-    key = s_ + i_1;
-    msg = s_ + i_0;
-
-    rain(key, msg, rain_output, witness, flag);
-    witness += lambda_bytes_ * 2;
-
-    result = rain_output + msg;
-    result.to_bytes(output.data());
-
-    if (flag && witness) {
-        result.to_bytes(witness);
-    }
-}
-
-void Signature::hash_pk_msg(const std::vector<uint8_t>& msg,
-                            std::vector<uint8_t>& mu) {
-    H1_context_t h1_ctx;
-    H1_init(&h1_ctx, lambda_);
-    for (auto& pk : pkey_) {
-        H1_update(&h1_ctx, pk.data(), pk.size());
-    }
-    H1_update(&h1_ctx, msg.data(), msg.size());
-    H1_final(&h1_ctx, mu.data(), 2 * lambda_bytes_);
-}
-
-void Signature::hash_challenge_1(const std::vector<uint8_t>& mu,
-                                 const std::vector<uint8_t>& hcom,
-                                 const std::vector<uint8_t>& c,
-                                 const std::vector<uint8_t>& iv,
-                                 std::vector<uint8_t>& chall_1,
-                                 unsigned int ell, unsigned int tau) {
+void hash_challenge_1(const std::vector<uint8_t>& mu,
+                      const std::vector<uint8_t>& hcom,
+                      const std::vector<uint8_t>& c,
+                      const std::vector<uint8_t>& iv,
+                      std::vector<uint8_t>& chall_1, unsigned int lambda,
+                      unsigned int ell, unsigned int tau) {
+    const unsigned int lambda_bytes = lambda / 8;
     const unsigned int ell_hat_bytes =
-        ell / 8 + lambda_bytes_ * 2 + UNIVERSAL_HASH_B;
+        ell / 8 + lambda_bytes * 2 + UNIVERSAL_HASH_B;
     H2_context_t h2_ctx;
-    H2_init(&h2_ctx, lambda_);
-    H2_update(&h2_ctx, mu.data(), lambda_bytes_ * 2);
-    H2_update(&h2_ctx, hcom.data(), lambda_bytes_ * 2);
+    H2_init(&h2_ctx, lambda);
+    H2_update(&h2_ctx, mu.data(), lambda_bytes * 2);
+    H2_update(&h2_ctx, hcom.data(), lambda_bytes * 2);
     H2_update(&h2_ctx, c.data(), ell_hat_bytes * (tau - 1));
     H2_update(&h2_ctx, iv.data(), IV_SIZE);
-    H2_final(&h2_ctx, chall_1.data(), 5 * lambda_bytes_ + 8);
+    H2_final(&h2_ctx, chall_1.data(), 5 * lambda_bytes + 8);
 }
 
-void Signature::hash_challenge_2(std::vector<uint8_t>& chall_2,
-                                 const std::vector<uint8_t>& chall_1,
-                                 const std::vector<uint8_t>& u_tilde,
-                                 const std::vector<uint8_t>& h_v,
-                                 const std::vector<uint8_t>& d,
-                                 unsigned int lambda, unsigned int ell) {
+void hash_challenge_2(std::vector<uint8_t>& chall_2,
+                      const std::vector<uint8_t>& chall_1,
+                      const std::vector<uint8_t>& u_tilde,
+                      const std::vector<uint8_t>& h_v,
+                      const std::vector<uint8_t>& d, unsigned int lambda,
+                      unsigned int ell) {
     const unsigned int lambda_bytes = lambda / 8;
     const unsigned int ell_bytes = ell / 8;
     const unsigned int u_tilde_bytes = lambda_bytes + UNIVERSAL_HASH_B;
@@ -116,11 +41,11 @@ void Signature::hash_challenge_2(std::vector<uint8_t>& chall_2,
     H2_final(&h2_ctx_1, chall_2.data(), 3 * lambda_bytes + 8);
 }
 
-void Signature::hash_challenge_3(std::vector<uint8_t>& chall_3,
-                                 const std::vector<uint8_t>& chall_2,
-                                 const std::vector<uint8_t>& a_tilde,
-                                 const std::vector<uint8_t>& b_tilde,
-                                 unsigned int lambda) {
+void hash_challenge_3(std::vector<uint8_t>& chall_3,
+                      const std::vector<uint8_t>& chall_2,
+                      const std::vector<uint8_t>& a_tilde,
+                      const std::vector<uint8_t>& b_tilde,
+                      unsigned int lambda) {
     const unsigned int lambda_bytes = lambda / 8;
 
     H2_context_t h2_ctx_2;
@@ -131,16 +56,16 @@ void Signature::hash_challenge_3(std::vector<uint8_t>& chall_3,
     H2_final(&h2_ctx_2, chall_3.data(), lambda_bytes);
 }
 
-field::GF2_128 Signature::zk_hash(const std::vector<uint8_t>& sd,
-                                  const std::vector<field::GF2_128>& x_0,
-                                  field::GF2_128& x_1) {
+field::GF2_128 zk_hash(const std::vector<uint8_t>& sd,
+                       const std::vector<field::GF2_128>& x_0,
+                       field::GF2_128& x_1) {
     field::GF2_128 r_0, r_1, s, h_0, h_1;
     r_0.from_bytes(sd.data());
-    r_1.from_bytes(sd.data() + lambda_bytes_);
-    s.from_bytes(sd.data() + lambda_bytes_ * 2);
+    r_1.from_bytes(sd.data() + 16UL);
+    s.from_bytes(sd.data() + 32UL);
 
-    uint64_t tmp;
-    memcpy(&tmp, sd.data() + lambda_bytes_ * 3, 8UL);
+    uint32_t tmp;
+    memcpy(&tmp, sd.data() + 48UL, 8UL);
     field::GF2_128 t(tmp);
     field::GF2_128 s_muti = s;
     field::GF2_128 t_muti = t;
@@ -153,40 +78,113 @@ field::GF2_128 Signature::zk_hash(const std::vector<uint8_t>& sd,
     return r_0 * h_0 + r_1 * h_1 + x_1;
 }
 
+void Signature::gen_x() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint8_t> dis(0, 1);
+
+    for (auto& x_i : x_) {
+        for (auto& value : x_i) {
+            value = dis(gen);
+        }
+    }
+}
+
+void Signature::gen_tree() {
+    for (int i = key_num_; i < tree_node_num_; i++) {
+        tree_[i] = x_[i - key_num_];
+    }
+    int index = key_num_ - 1;
+    while (index != 0) {
+        hash_1(tree_[2 * index], tree_[2 * index + 1], s_0_, tree_[index],
+               nullptr, 0);
+        index--;
+    }
+    tree_root = tree_[1];
+}
+
+void Signature::hash_1(const std::vector<uint8_t>& input_0,
+                       const std::vector<uint8_t>& input_1,
+                       const std::vector<uint8_t>& s_byte,
+                       std::vector<uint8_t>& output, uint8_t* witness,
+                       bool flag) {
+    if (flag && witness) {
+        memcpy(witness, input_0.data(), 16UL);
+        memcpy(witness + 16UL, input_1.data(), 16UL);
+        memcpy(witness + 32UL, s_byte.data(), 16UL);
+        witness += 48UL;
+    }
+    field::GF2_128 i_0, i_1, s, s_, key, msg, rain_output, result;
+    i_0.from_bytes(input_0.data());
+    i_1.from_bytes(input_1.data());
+    s.from_bytes(s_byte.data());
+    s_ = (i_0 + i_1) * s;
+    if (flag && witness) {
+        s_.to_bytes(witness);
+        witness += 16UL;
+    }
+    key = s_ + i_1;
+    msg = s_ + i_0;
+    rain(key, msg, rain_output, witness, flag);
+    witness += 16UL * (NUM_SBOXES - 1);
+    result = rain_output + msg;
+    result.to_bytes(output.data());
+    if (flag && witness) {
+        result.to_bytes(witness);
+    }
+}
+
+void Signature::hash_mu(std::vector<uint8_t>& mu) {
+    H1_context_t h1_ctx;
+    H1_init(&h1_ctx, lambda_);
+    H1_update(&h1_ctx, tree_[1].data(), tree_[1].size());
+    H1_final(&h1_ctx, mu.data(), 2 * lambda_bytes_);
+}
+
 void Signature::gen_rootkey_iv(const std::vector<uint8_t>& mu,
                                const uint8_t signer_index,
                                std::vector<uint8_t>& rootkey,
                                std::vector<uint8_t>& iv) {
     H3_context_t h3_ctx;
     H3_init(&h3_ctx, lambda_);
-    H3_update(&h3_ctx, skey_[signer_index].data(), lambda_bytes_);
+    H3_update(&h3_ctx, x_[signer_index].data(), lambda_bytes_);
     H3_update(&h3_ctx, mu.data(), lambda_bytes_ * 2);
     H3_final(&h3_ctx, rootkey.data(), lambda_bytes_, iv.data());
 }
 
 void Signature::gen_witness(uint8_t* witness, unsigned int index) {
     std::vector<uint8_t> tmp;
-    rain(skey_[index], rain_msg_, tmp, witness, 1);
-    witness +=
-        3 * lambda_bytes_;  // 最后一个witness和下一次hash重叠了，因此+3而非4
+    tmp.resize(lambda_bytes_);
     index = index + key_num_;
     while (index != 1) {
         if (index % 2) {
             hash_1(tree_[index], tree_[index - 1], s_1_, tmp, witness, 1);
-            witness += 6 * lambda_bytes_;
+            witness += (3+NUM_SBOXES) * 16UL;
             index = index / 2;
         } else {
             hash_1(tree_[index], tree_[index + 1], s_0_, tmp, witness, 1);
-            witness += 6 * lambda_bytes_;
+            witness += (3+NUM_SBOXES) * 16UL;
             index = index / 2;
         }
     }
 }
 
-void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
+void Signature::get_x_(std::vector<uint8_t>& x_index, int index, int length) {
+    if (length == 1) {
+        x_index = x_[index];
+    } else if (length == 2) {
+        x_index.resize(2*lambda_bytes_);
+        std::copy(x_[index].data(), x_[index].data() + lambda_bytes_,
+                  x_index.data());
+        std::copy(x_[index + 1].data(), x_[index + 1].data() + lambda_bytes_,
+                  x_index.data() + lambda_bytes_);
+    }
+}
+
+void Signature:: sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
                      signature_t* sig) {
-    const unsigned int ell = (4 + 6 * log2(key_num_)) * lambda_;
-    const unsigned int muti_times = 3 + 4 * log2(key_num_);
+    const unsigned int ell = (3 + NUM_SBOXES) * log2(key_num_) * 128 + 128;
+    const unsigned int muti_times = (1 + NUM_SBOXES) * log2(key_num_);
     const unsigned int ell_bytes = ell / 8;
     const unsigned int ell_hat = ell + lambda_ * 2 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
@@ -194,14 +192,14 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
     // auto start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> mu(2 * lambda_bytes_);
-    hash_pk_msg(msg, mu);
+    hash_mu(mu);
 
     std::vector<uint8_t> rootkey(lambda_bytes_);
+
     sig->iv.resize(iv_size_);
+
     // std::vector<uint8_t> iv(iv_size_);
     gen_rootkey_iv(mu, signer_index, rootkey, sig->iv);
-
-    auto vole_commit_start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> hcom(lambda_bytes_ * 2);
     std::vector<vec_com_t> vecCom(params_.tau);
@@ -218,13 +216,12 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
     vole_commit(rootkey.data(), sig->iv.data(), ell_hat, &(params_),
                 hcom.data(), vecCom.data(), sig->c.data(), u.data(), V.data());
 
-    auto vole_commit_end_time = std::chrono::high_resolution_clock::now();
-
     std::vector<uint8_t> chall_1(5 * lambda_bytes_ + 8);
-    hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, ell, params_.tau);
+    hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, lambda_, ell,
+                     params_.tau);
 
     sig->u_tilde.resize(lambda_bytes_ + UNIVERSAL_HASH_B);
-    // std::vector<uint8_t> u_tilde(lambda_bytes_ + UNIVERSAL_HASH_B);
+
     vole_hash(sig->u_tilde.data(), chall_1.data(), u.data(), ell, lambda_);
 
     std::vector<uint8_t> h_v(lambda_bytes_ * 2);
@@ -246,6 +243,7 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
     std::vector<uint8_t> witness(ell_bytes);
     gen_witness(witness.data(), signer_index);
     sig->d.resize(ell_bytes);
+
     // std::vector<uint8_t> d(ell_bytes);
     xor_u8_array(witness.data(), u.data(), sig->d.data(), ell_bytes);
 
@@ -253,7 +251,7 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
     hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d, lambda_, ell);
 
     std::vector<field::GF2_128> v_gf_128_vec(ell_hat);
-    std::vector<field::GF2_128> v_combined_gf_128_vec(ell_hat / lambda_);
+    std::vector<field::GF2_128> v_combined_gf_128_vec(ell_hat / 128);
     convert_vec_to_field(V.data(), v_gf_128_vec.data(), ell_hat, lambda_);
     gen_combined_field_vec(v_gf_128_vec.data(), v_combined_gf_128_vec.data(),
                            ell_hat);
@@ -264,11 +262,10 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
     path_prove(witness.data(), v_combined_gf_128_vec.data(),
                v_gf_128_vec.data(), rain_msg_, A_0.data(), A_1.data(),
                log2(key_num_));
-
     field::GF2_128 u_star;
     u_star.from_bytes(u.data() + ell_bytes);
     field::GF2_128 A_0_tilde =
-        zk_hash(chall_2, A_0, v_combined_gf_128_vec[ell / lambda_]);
+        zk_hash(chall_2, A_0, v_combined_gf_128_vec[ell / 128]);
     field::GF2_128 A_1_tilde = zk_hash(chall_2, A_1, u_star);
 
     std::vector<uint8_t> A_0_tilde_bytes(lambda_bytes_);
@@ -277,8 +274,10 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
     A_1_tilde.to_bytes(sig->A_1_tilde_bytes.data());
 
     sig->chall_3.resize(lambda_bytes_);
+
     // std::vector<uint8_t> chall_3(lambda_bytes_);
     sig->pdec.resize(params_.tau);
+
     sig->com.resize(params_.tau);
     // std::vector<uint8_t*> pdec(params_.tau);
     // std::vector<uint8_t*> com(params_.tau);
@@ -301,25 +300,13 @@ void Signature::sign(unsigned int signer_index, const std::vector<uint8_t>& msg,
         vec_com_clear(&vecCom[i]);
     }
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-
-    // auto total_time = end_time - start_time;
-    auto vole_time = vole_commit_end_time - vole_commit_start_time;
-
-    // std::cout << "sign total time is : "
-    //           << std::chrono::duration<double,
-    //           std::milli>(total_time).count()
-    //           << " ms" << std::endl;
-    std::cout << "vole commit time is : "
-              << std::chrono::duration<double, std::milli>(vole_time).count()
-              << " ms" << std::endl;
-    delete V[0];
+    delete[] V[0];
 }
 
 bool Signature::verify(const std::vector<uint8_t>& msg,
                        const signature_t* sig) {
-    const unsigned int ell = (4 + 6 * log2(key_num_)) * lambda_;
-    const unsigned int muti_times = 3 + 4 * log2(key_num_);
+    const unsigned int ell = (3 + NUM_SBOXES)* log2(key_num_) * 128 + 128;
+    const unsigned int muti_times = (1 + NUM_SBOXES) * log2(key_num_);
     const unsigned int ell_bytes = ell / 8;
     const unsigned int ell_hat = ell + lambda_ * 2 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
@@ -327,7 +314,7 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     // auto start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> mu(2 * lambda_bytes_);
-    hash_pk_msg(msg, mu);
+    hash_mu(mu);
 
     auto vole_reconstruct_start_time =
         std::chrono::high_resolution_clock::now();
@@ -344,7 +331,8 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     auto vole_reconstruct_end_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> chall_1(5 * lambda_bytes_ + 8);
-    hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, ell, params_.tau);
+    hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, lambda_, ell,
+                     params_.tau);
 
     std::vector<uint8_t*> Q_(lambda_);
     Q_[0] = new uint8_t[lambda_ * ell_hat_bytes];
@@ -405,7 +393,7 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
         }
         H1_final(&h1_ctx_1, h_v.data(), lambda_bytes_ * 2);
     }
-    delete Dtilde[0];
+    delete[] Dtilde[0];
 
     std::vector<uint8_t> chall_2(3 * lambda_bytes_ + 8);
     hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d, lambda_, ell);
@@ -423,7 +411,7 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     }
 
     std::vector<field::GF2_128> q_gf_128_vec(ell_hat);
-    std::vector<field::GF2_128> q_combined_gf_128_vec(ell_hat / lambda_);
+    std::vector<field::GF2_128> q_combined_gf_128_vec(ell_hat / 128);
     convert_vec_to_field(Q_.data(), q_gf_128_vec.data(), ell_hat, lambda_);
     gen_combined_field_vec(q_gf_128_vec.data(), q_combined_gf_128_vec.data(),
                            ell_hat);
@@ -431,13 +419,15 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     field::GF2_128 delta_field;
     delta_field.from_bytes(sig->chall_3.data());
 
+    
+
     std::vector<field::GF2_128> B(muti_times);
     path_verify(q_combined_gf_128_vec.data(), q_gf_128_vec.data(), delta_field,
                 rain_msg_, B.data(), log2(key_num_));
 
     field::GF2_128 zero;
     field::GF2_128 B_tilde =
-        zk_hash(chall_2, B, q_combined_gf_128_vec[ell / lambda_]);
+        zk_hash(chall_2, B, q_combined_gf_128_vec[ell / 128]);
 
     field::GF2_128 A_0_tilde, A_1_tilde;
     std::vector<uint8_t> A_0_tilde_bytes(lambda_bytes_);
@@ -450,21 +440,21 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     hash_challenge_3(chall_3, chall_2, sig->A_1_tilde_bytes, A_0_tilde_bytes,
                      lambda_);
 
-    // auto end_time = std::chrono::high_resolution_clock::now();
+    // // auto end_time = std::chrono::high_resolution_clock::now();
 
-    // auto total_time = end_time - start_time;
-    auto vole_time = vole_reconstruct_end_time - vole_reconstruct_start_time;
+    // // auto total_time = end_time - start_time;
+    // auto vole_time = vole_reconstruct_end_time - vole_reconstruct_start_time;
 
-    // std::cout << "verify total time is : "
-    //           << std::chrono::duration<double,
-    //           std::milli>(total_time).count()
+    // // std::cout << "verify total time is : "
+    // //           << std::chrono::duration<double,
+    // //           std::milli>(total_time).count()
+    // //           << " ms" << std::endl;
+    // std::cout << "verify vole reconstruct time is : "
+    //           << std::chrono::duration<double, std::milli>(vole_time).count()
     //           << " ms" << std::endl;
-    std::cout << "vole reconstruct time is : "
-              << std::chrono::duration<double, std::milli>(vole_time).count()
-              << " ms" << std::endl;
 
-    delete Q[0];
-    delete Q_[0];
+    delete[] Q[0];
+    delete[] Q_[0];
 
     return memcmp(chall_3.data(), sig->chall_3.data(), lambda_bytes_) == 0;
 }

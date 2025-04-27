@@ -8,7 +8,7 @@
 #include "compat.h"
 #include "macros.h"
 
-
+#define GET_BIT(value, bit_pos) (((value) >> (bit_pos)) & 1)
 
 FAEST_BEGIN_C_DECL
 

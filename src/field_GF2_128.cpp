@@ -409,7 +409,7 @@ field::GF2_128 combine_bf128_vec(field::GF2_128 *bf128_vec) {
     field::GF2_128 result;
     for (int i = 0; i < 16; i++) {
         for (int j = 7; j >= 0; j--) {
-            result += bf128_vec[8 * i + j] * field_base_128[8 * i + 7 - j];
+            result += bf128_vec[8 * i + j] * field_base_128[8 * i +  j];
         }
     }
     return result;
@@ -420,7 +420,7 @@ field::GF2_128 gf128_vec_muti_with_transposed_GF2_matrix(
     field::GF2_128 result;
     for (int i = 0; i < 128; i++) {
         field::GF2_128 tmp(matrix[i]);
-        result += tmp * gf128_vec[i / 8 * 8 + 7 - i % 8];
+        result += tmp * gf128_vec[i / 8 * 8 + i % 8];
     }
     return result;
 }

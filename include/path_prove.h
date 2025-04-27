@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "field.h"
-#include "rain.h"
+#include "rain_4.h"
 #include "utils.h"
 
 void rain_enc_forward_128_1(const uint8_t* witness,
