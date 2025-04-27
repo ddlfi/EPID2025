@@ -1,7 +1,7 @@
-# Ring Signature base on VOLEith and Hash Function
+# Baps 128
 
 ## Introduction
-This project is an implementation of ring signature based on hash functions and VOLEith tech.
+This project is an implementation of Baps based on VOLEith tech.
 
 ## Environment Requirements
 
