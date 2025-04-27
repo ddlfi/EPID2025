@@ -1,4 +1,4 @@
-# Baps 128
+# Hash-Based-BAPS
 
 ## Introduction
 This project is an implementation of Baps based on VOLEith tech.
