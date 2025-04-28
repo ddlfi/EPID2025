@@ -1,7 +1,7 @@
 # Hash-Based-BAPS
 
 ## Introduction
-This project is an implementation of Baps based on VOLEith tech.
+This project is an implementation of hash-based BAPS via the VOLEitH techniques.
 
 ## Environment Requirements
 
