@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-
+#include <assert.h>
 
 #include "compat.h"
 #include "macros.h"
@@ -24,6 +24,19 @@ static inline void masked_xor_u8_array(const uint8_t* a, const uint8_t* b, uint8
   for (size_t i = 0; i < len; i++) {
     out[i] = a[i] ^ (b[i] & mask);
   }
+}
+
+static inline void setbit(uint8_t* value, uint8_t position, uint8_t value_to_set) {
+    assert(position < 8);
+    const uint8_t mask = 1 << position;
+    *value = (*value & ~mask) | ((value_to_set ? 1 : 0) << position);
+}
+
+static inline uint8_t parity(uint8_t x) {
+    x ^= x >> 4;    
+    x ^= x >> 2;    
+    x ^= x >> 1;    
+    return x & 1;
 }
 
 #define get_bit(value, index) (((value) >> (index)) & 1)
