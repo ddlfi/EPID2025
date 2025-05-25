@@ -233,20 +233,14 @@ template <typename GF>
 std::vector<GF> operator*(const std::vector<GF> &lhs,
                           const std::vector<GF> &rhs);
 
-extern std::vector<field::GF2_256> field_base;
+extern std::vector<field::GF2_256> field_base_256;
 
-void gen_field_base(std::vector<field::GF2_256> &field_base);
+void gen_field_base_256(std::vector<field::GF2_256> &field_base);
 
-field::GF2_256 combine_bf256_vec(field::GF2_256 *bf256_vec);
-
-field::GF2_256 gf256_vec_muti_with_transposed_GF2_matrix(
-    field::GF2_256 *gf256_vec, const std::array<uint64_t, 4> *matrix);
+field::GF2_256 combine_gf_vec(field::GF2_256 *gf_vec);
 
 extern std::vector<field::GF2_128> field_base_128;
 
 void gen_field_base_128(std::vector<field::GF2_128> &field_base);
 
-field::GF2_128 combine_bf128_vec(field::GF2_128 *bf128_vec);
-
-field::GF2_128 gf128_vec_muti_with_transposed_GF2_matrix(
-    field::GF2_128 *gf128_vec, const std::array<uint64_t, 2> *matrix);
+field::GF2_128 combine_gf_vec(field::GF2_128 *gf_vec);

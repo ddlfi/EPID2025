@@ -4,7 +4,9 @@
 #include <cmath>
 #include <random>
 
-void Signature::calculate_params() {
+
+template <typename GF2>
+void Signature<GF2>::calculate_params() {
     int tmp = m_;
     while (tmp > 1) {
         ell_ += tmp + tmp / 2;
@@ -15,7 +17,8 @@ void Signature::calculate_params() {
     ell_ += (8 - ell_ % 8);
 }
 
-void Signature::gen_matrix() {
+template <typename GF2>
+void Signature<GF2>::gen_matrix() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<uint8_t> dis(0, 255);
@@ -24,7 +27,8 @@ void Signature::gen_matrix() {
     }
 }
 
-void Signature::gen_x() {
+template <typename GF2>
+void Signature<GF2>::gen_x() {
     const int num_bytes = (m_ + 7) / 8;
     x_.resize(num_bytes);
 
@@ -35,13 +39,14 @@ void Signature::gen_x() {
     std::mt19937 rng(rd());
     std::shuffle(positions.begin(), positions.end(), rng);
 
-    for (int i = 0; i < hamming_weight; i++) {
+    for (int i = 0; i < hamming_weight_; i++) {
         const int pos = positions[i];
         setbit(&x_[pos / 8], pos % 8,1);
     }
 }
 
-void Signature::calculate_y() {
+template <typename GF2>
+void Signature<GF2>::calculate_y() {
 
     for (const auto& row : matrix_) {
         uint8_t acc = 0;
@@ -52,7 +57,8 @@ void Signature::calculate_y() {
     }
 }
 
-void Signature::hash_mu(const std::vector<uint8_t>& msg,
+template <typename GF2>
+void Signature<GF2>::hash_mu(const std::vector<uint8_t>& msg,
                         std::vector<uint8_t>& mu) {
     H1_context_t h1_ctx;
     H1_init(&h1_ctx, lambda_);
@@ -60,7 +66,8 @@ void Signature::hash_mu(const std::vector<uint8_t>& msg,
     H1_final(&h1_ctx, mu.data(), 2 * lambda_bytes_);
 }
 
-void Signature::hash_challenge_1(const std::vector<uint8_t>& mu,
+template <typename GF2>
+void Signature<GF2>::hash_challenge_1(const std::vector<uint8_t>& mu,
                                  const std::vector<uint8_t>& hcom,
                                  const std::vector<uint8_t>& c,
                                  const std::vector<uint8_t>& iv,
@@ -77,7 +84,8 @@ void Signature::hash_challenge_1(const std::vector<uint8_t>& mu,
     H2_final(&h2_ctx, chall_1.data(), 5 * lambda_bytes_ + 8);
 }
 
-void Signature::hash_challenge_2(std::vector<uint8_t>& chall_2,
+template <typename GF2>
+void Signature<GF2>::hash_challenge_2(std::vector<uint8_t>& chall_2,
                                  const std::vector<uint8_t>& chall_1,
                                  const std::vector<uint8_t>& u_tilde,
                                  const std::vector<uint8_t>& h_v,
@@ -96,7 +104,8 @@ void Signature::hash_challenge_2(std::vector<uint8_t>& chall_2,
     H2_final(&h2_ctx_1, chall_2.data(), 3 * lambda_bytes + 8);
 }
 
-void Signature::hash_challenge_3(std::vector<uint8_t>& chall_3,
+template <typename GF2>
+void Signature<GF2>::hash_challenge_3(std::vector<uint8_t>& chall_3,
                                  const std::vector<uint8_t>& chall_2,
                                  const std::vector<uint8_t>& a_tilde,
                                  const std::vector<uint8_t>& b_tilde,
@@ -111,19 +120,20 @@ void Signature::hash_challenge_3(std::vector<uint8_t>& chall_3,
     H2_final(&h2_ctx_2, chall_3.data(), lambda_bytes);
 }
 
-field::GF2_128 Signature::zk_hash(const std::vector<uint8_t>& sd,
-                                  const std::vector<field::GF2_128>& x_0,
-                                  field::GF2_128& x_1) {
-    field::GF2_128 r_0, r_1, s, h_0, h_1;
+template <typename GF2>
+GF2 Signature<GF2>::zk_hash(const std::vector<uint8_t>& sd,
+                                  const std::vector<GF2>& x_0,
+                                  GF2& x_1) {
+    GF2 r_0, r_1, s, h_0, h_1;
     r_0.from_bytes(sd.data());
     r_1.from_bytes(sd.data() + lambda_bytes_);
     s.from_bytes(sd.data() + lambda_bytes_ * 2);
 
     uint64_t tmp;
     memcpy(&tmp, sd.data() + lambda_bytes_ * 3, 8UL);
-    field::GF2_128 t(tmp);
-    field::GF2_128 s_muti = s;
-    field::GF2_128 t_muti = t;
+    GF2 t(tmp);
+    GF2 s_muti = s;
+    GF2 t_muti = t;
     for (auto& x_0_i : x_0) {
         h_0 += s_muti * x_0_i;
         h_1 += t_muti * x_0_i;
@@ -133,7 +143,8 @@ field::GF2_128 Signature::zk_hash(const std::vector<uint8_t>& sd,
     return r_0 * h_0 + r_1 * h_1 + x_1;
 }
 
-void Signature::gen_rootkey_iv(const std::vector<uint8_t>& mu,
+template <typename GF2>
+void Signature<GF2>::gen_rootkey_iv(const std::vector<uint8_t>& mu,
                                std::vector<uint8_t>& rootkey,
                                std::vector<uint8_t>& iv) {
     H3_context_t h3_ctx;
@@ -142,7 +153,8 @@ void Signature::gen_rootkey_iv(const std::vector<uint8_t>& mu,
     H3_final(&h3_ctx, rootkey.data(), lambda_bytes_, iv.data());
 }
 
-void Signature::sign(const std::vector<uint8_t>& msg, signature_t* sig) {
+template <typename GF2>
+void Signature<GF2>::sign(const std::vector<uint8_t>& msg, signature_t<GF2>* sig) {
     const unsigned int ell = ell_;
     const unsigned int muti_times = muti_num_;
     const unsigned int ell_bytes = ell / 8;
@@ -197,30 +209,30 @@ void Signature::sign(const std::vector<uint8_t>& msg, signature_t* sig) {
     std::vector<uint8_t> chall_2(3 * lambda_bytes_ + 8);
     hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d, lambda_, ell);
 
-    std::vector<field::GF2_128> v_gf_128_vec(ell_hat);
-    convert_vec_to_field(V.data(), v_gf_128_vec.data(), ell_hat, lambda_);
+    std::vector<GF2> v_gf_vec(ell_hat);
+    convert_vec_to_field(V.data(), v_gf_vec.data(), ell_hat, lambda_);
 
     sig->A_linear.resize(k_);
-    get_constrain_prover_linear(matrix_,v_gf_128_vec.data(),sig->A_linear.data(),m_);
+    get_constrain_prover_linear(matrix_,v_gf_vec.data(),sig->A_linear.data(),m_);
 
-    std::vector<field::GF2_128> A_0(muti_times);
-    std::vector<field::GF2_128> A_1(muti_times);
+    std::vector<GF2> A_0(muti_times);
+    std::vector<GF2> A_1(muti_times);
     sig->hamming_weight_vec.resize(std::floor(log2(m_) + 1e-10));
     sig->hamming_weight_v.resize(std::floor(log2(m_) + 1e-10));
 
-    get_hamming_weight(witness.data(), v_gf_128_vec.data(),
+    get_hamming_weight(witness.data(), v_gf_vec.data(),
                        sig->hamming_weight_vec.data(),
                        sig->hamming_weight_v.data(), m_);
 
-    get_constrain_prover(v_gf_128_vec.data(), witness.data(), A_0.data(),
+    get_constrain_prover(v_gf_vec.data(), witness.data(), A_0.data(),
                          A_1.data(), muti_times, m_);
 
-    field::GF2_128 u_star;
-    field::GF2_128 v_star;
+    GF2 u_star;
+    GF2 v_star;
     u_star.from_bytes(u.data() + ell_bytes);
-    v_star = combine_bf128_vec(v_gf_128_vec.data() + ell);
-    field::GF2_128 A_0_tilde = zk_hash(chall_2, A_0, v_star);
-    field::GF2_128 A_1_tilde = zk_hash(chall_2, A_1, u_star);
+    v_star = combine_gf_vec(v_gf_vec.data() + ell);
+    GF2 A_0_tilde = zk_hash(chall_2, A_0, v_star);
+    GF2 A_1_tilde = zk_hash(chall_2, A_1, u_star);
 
     std::vector<uint8_t> A_0_tilde_bytes(lambda_bytes_);
     sig->A_1_tilde_bytes.resize(lambda_bytes_);
@@ -261,13 +273,16 @@ void Signature::sign(const std::vector<uint8_t>& msg, signature_t* sig) {
     delete[] V[0];
 }
 
-bool Signature::verify(const std::vector<uint8_t>& msg,
-                       const signature_t* sig) {
+template <typename GF2>
+bool Signature<GF2>::verify(const std::vector<uint8_t>& msg,
+                       const signature_t<GF2>* sig) {
     const unsigned int ell = ell_;
     const unsigned int muti_times = muti_num_;
     const unsigned int ell_bytes = ell / 8;
     const unsigned int ell_hat = ell + lambda_ * 2 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
+
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<uint8_t> mu(2 * lambda_bytes_);
     hash_mu(msg, mu);
@@ -303,7 +318,7 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
         const unsigned int depth = i < params_.tau0 ? params_.k0 : params_.k1;
 
         // Step 11
-        uint8_t delta[8];
+        uint8_t delta[12];
         ChalDec(sig->chall_3.data(), i, params_.k0, params_.tau0, params_.k1,
                 params_.tau1, delta);
         // Step 16
@@ -360,38 +375,38 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
         }
     }
 
-    std::vector<field::GF2_128> q_gf_128_vec(ell_hat);
-    convert_vec_to_field(Q_.data(), q_gf_128_vec.data(), ell_hat, lambda_);
+    std::vector<GF2> q_gf_vec(ell_hat);
+    convert_vec_to_field(Q_.data(), q_gf_vec.data(), ell_hat, lambda_);
 
-    field::GF2_128 delta_field;
+    GF2 delta_field;
     delta_field.from_bytes(sig->chall_3.data());
     
 
-    std::vector<field::GF2_128> B_linear(k_);
-    get_constrain_verifier_linear(matrix_,y_,q_gf_128_vec.data(),delta_field,B_linear.data(),m_);
+    std::vector<GF2> B_linear(k_);
+    get_constrain_verifier_linear(matrix_,y_,q_gf_vec.data(),delta_field,B_linear.data(),m_);
     if(!verify_constrain_linear(sig->A_linear.data(),B_linear.data(),k_)){
         return false;
     }
 
     // check hamming weight
-    if (!verify_hamming_weight(hamming_weight, sig->hamming_weight_vec.data(),
+    if (!verify_hamming_weight(hamming_weight_, sig->hamming_weight_vec.data(),
                                sig->hamming_weight_v.data(),
-                               q_gf_128_vec.data(), delta_field, m_)) {
+                               q_gf_vec.data(), delta_field, m_)) {
         return false;
     }
 
 
 
-    std::vector<field::GF2_128> B(muti_times);
-    get_constrain_verifier(q_gf_128_vec.data(), delta_field, B.data(),
+    std::vector<GF2> B(muti_times);
+    get_constrain_verifier(q_gf_vec.data(), delta_field, B.data(),
                            muti_times, m_);
 
-    field::GF2_128 zero;
-    field::GF2_128 q_star;
-    q_star = combine_bf128_vec(q_gf_128_vec.data() + ell);
-    field::GF2_128 B_tilde = zk_hash(chall_2, B, q_star);
+    GF2 zero;
+    GF2 q_star;
+    q_star = combine_gf_vec(q_gf_vec.data() + ell);
+    GF2 B_tilde = zk_hash(chall_2, B, q_star);
 
-    field::GF2_128 A_0_tilde, A_1_tilde;
+    GF2 A_0_tilde, A_1_tilde;
     std::vector<uint8_t> A_0_tilde_bytes(lambda_bytes_);
 
     A_1_tilde.from_bytes(sig->A_1_tilde_bytes.data());
@@ -402,8 +417,21 @@ bool Signature::verify(const std::vector<uint8_t>& msg,
     hash_challenge_3(chall_3, chall_2, sig->A_1_tilde_bytes, A_0_tilde_bytes,
                      lambda_);
 
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    auto total_time = end_time - start_time;
+    auto during_time =
+        std::chrono::duration<double, std::milli>(total_time).count();
+    std::cout << "verify total time is : "
+              << std::chrono::duration<double, std::milli>(total_time).count()
+              << " ms" << std::endl;
+
     delete[] Q[0];
     delete[] Q_[0];
 
     return memcmp(chall_3.data(), sig->chall_3.data(), lambda_bytes_) == 0;
 }
+
+
+template class Signature<field::GF2_128>;
+template class Signature<field::GF2_256>; 

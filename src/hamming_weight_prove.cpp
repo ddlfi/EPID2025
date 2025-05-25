@@ -110,11 +110,13 @@ void get_mutigate_u(const uint8_t* witness, uint8_t* bf_y, int m) {
     }
 }
 
-void get_mutigate_v(const field::GF2_128* v, field::GF2_128* bf_y, int m) {
+
+template <typename GF2>
+void get_mutigate_v(const GF2* v, GF2* bf_y, int m) {
     int input_length = m;
     int base = 0;
     int index = 0;
-    field::GF2_128 v1, v2, v3, v4;
+    GF2 v1, v2, v3, v4;
     while (input_length > 1) {
         for (int i = 0; i < (input_length - 1) / 2; i++) {
             // FA
@@ -149,11 +151,13 @@ void get_mutigate_v(const field::GF2_128* v, field::GF2_128* bf_y, int m) {
     }
 }
 
-void get_mutigate_q(const field::GF2_128* q, field::GF2_128* bf_y, int m) {
+
+template <typename GF2>
+void get_mutigate_q(const GF2* q, GF2* bf_y, int m) {
     int input_length = m;
     int base = 0;
     int index = 0;
-    field::GF2_128 q1, q2, q3, q4;
+    GF2 q1, q2, q3, q4;
     while (input_length > 1) {
         for (int i = 0; i < (input_length - 1) / 2; i++) {
             // FA
@@ -188,11 +192,12 @@ void get_mutigate_q(const field::GF2_128* q, field::GF2_128* bf_y, int m) {
     }
 }
 
-void get_constrain_prover(const field::GF2_128* v, const uint8_t* witness,
-                          field::GF2_128* A_0, field::GF2_128* A_1,
+template <typename GF2>
+void get_constrain_prover(const GF2* v, const uint8_t* witness,
+                          GF2* A_0, GF2* A_1,
                           int mutigate_num, int m) {
     std::vector<uint8_t> mutigate_u(mutigate_num);
-    std::vector<field::GF2_128> mutigate_v(3 * mutigate_num);
+    std::vector<GF2> mutigate_v(3 * mutigate_num);
     get_mutigate_u(witness, mutigate_u.data(), m);
     get_mutigate_v(v, mutigate_v.data(), m);
     for (int i = 0; i < mutigate_num; i++) {
@@ -203,9 +208,10 @@ void get_constrain_prover(const field::GF2_128* v, const uint8_t* witness,
     }
 }
 
-void get_constrain_verifier(const field::GF2_128* q, field::GF2_128 delta,
-                            field::GF2_128* B, int mutigate_num, int m) {
-    std::vector<field::GF2_128> mutigate_q(3 * mutigate_num);
+template <typename GF2>
+void get_constrain_verifier(const GF2* q, GF2 delta,
+                            GF2* B, int mutigate_num, int m) {
+    std::vector<GF2> mutigate_q(3 * mutigate_num);
     get_mutigate_q(q, mutigate_q.data(), m);
     for (int i = 0; i < mutigate_num; i++) {
         B[i] = mutigate_q[3 * i] * mutigate_q[3 * i + 1] -
@@ -213,20 +219,22 @@ void get_constrain_verifier(const field::GF2_128* q, field::GF2_128 delta,
     }
 }
 
-void convert_vec_to_field(uint8_t** vec, field::GF2_128* field_vec,
+template <typename GF2>
+void convert_vec_to_field(uint8_t** vec, GF2* field_vec,
                           const unsigned int ell, const unsigned int lambda) {
     for (unsigned int row = 0; row < ell; row++) {
         uint8_t new_row[lambda / 8] = {0};
-        for (unsigned int column = 0; column < 128; ++column) {
+        for (unsigned int column = 0; column < lambda; ++column) {
             ptr_set_bit(new_row, ptr_get_bit(vec[column], row), column);
         }
         field_vec[row / 8 * 8 + (row % 8)].from_bytes(new_row);
     }
 }
 
-void get_hamming_weight(uint8_t* witness, field::GF2_128* v,
+template <typename GF2>
+void get_hamming_weight(uint8_t* witness, GF2* v,
                         uint8_t* hamming_weight_vec,
-                        field::GF2_128* hamming_weight_v, int m) {
+                        GF2* hamming_weight_v, int m) {
     int input_length = m;
     int base = 0;
     int index = 0;
@@ -241,7 +249,8 @@ void get_hamming_weight(uint8_t* witness, field::GF2_128* v,
     }
 }
 
-void get_hamming_weight_q(const field::GF2_128* q, field::GF2_128* hamming_weight_q,
+template <typename GF2>
+void get_hamming_weight_q(const GF2* q, GF2* hamming_weight_q,
                           int m) {
     int input_length = m;
     int base = 0;
@@ -254,11 +263,12 @@ void get_hamming_weight_q(const field::GF2_128* q, field::GF2_128* hamming_weigh
     }
 }
 
+template <typename GF2>
 bool verify_hamming_weight(int hamming_weight, const uint8_t* hamming_weight_vec,
-                           const field::GF2_128* hamming_weight_v, const field::GF2_128* q,
-                           field::GF2_128 delta, int m) {
+                           const GF2* hamming_weight_v, const GF2* q,
+                           GF2 delta, int m) {
     int vec_length = std::floor(log2(m) + 1e-10);
-    std::vector<field::GF2_128> hamming_weight_q(vec_length);
+    std::vector<GF2> hamming_weight_q(vec_length);
     int cnt = 0;
     get_hamming_weight_q(q,hamming_weight_q.data(),m);
 
@@ -276,3 +286,57 @@ bool verify_hamming_weight(int hamming_weight, const uint8_t* hamming_weight_vec
     }
     return cnt == hamming_weight;
 }
+
+
+
+
+
+
+template void get_mutigate_v<field::GF2_128>(const field::GF2_128* v, field::GF2_128* bf_y, int m);
+
+template void get_mutigate_q<field::GF2_128>(const field::GF2_128* q, field::GF2_128* bf_y, int m);
+
+template void get_constrain_prover<field::GF2_128>(const field::GF2_128* v, const uint8_t* witness, field::GF2_128* A_0,
+                          field::GF2_128* A_1, int mutigate_num, int m);
+
+template void get_constrain_verifier<field::GF2_128>(const field::GF2_128* q, field::GF2_128 delta, field::GF2_128* B, int mutigate_num,
+                            int m);
+
+template void convert_vec_to_field<field::GF2_128>(uint8_t** vec, field::GF2_128* field_vec, const unsigned int ell,
+                          const unsigned int lambda);
+
+template void get_hamming_weight<field::GF2_128>(uint8_t* witness, field::GF2_128* v, uint8_t* hamming_weight_vec,
+                        field::GF2_128* hamming_weight_v, int m);
+
+template void get_hamming_weight_q<field::GF2_128>(const field::GF2_128* q, field::GF2_128* hamming_weight_q, int m);
+
+template bool verify_hamming_weight<field::GF2_128>(int hamming_weight,
+                           const uint8_t* hamming_weight_vec,
+                           const field::GF2_128* hamming_weight_v, const field::GF2_128* q, field::GF2_128 delta,
+                           int m);
+
+
+
+
+template void get_mutigate_v<field::GF2_256>(const field::GF2_256* v, field::GF2_256* bf_y, int m);
+
+template void get_mutigate_q<field::GF2_256>(const field::GF2_256* q, field::GF2_256* bf_y, int m);
+
+template void get_constrain_prover<field::GF2_256>(const field::GF2_256* v, const uint8_t* witness, field::GF2_256* A_0,
+                          field::GF2_256* A_1, int mutigate_num, int m);
+
+template void get_constrain_verifier<field::GF2_256>(const field::GF2_256* q, field::GF2_256 delta, field::GF2_256* B, int mutigate_num,
+                            int m);
+
+template void convert_vec_to_field<field::GF2_256>(uint8_t** vec, field::GF2_256* field_vec, const unsigned int ell,
+                          const unsigned int lambda);
+
+template void get_hamming_weight<field::GF2_256>(uint8_t* witness, field::GF2_256* v, uint8_t* hamming_weight_vec,
+                        field::GF2_256* hamming_weight_v, int m);
+
+template void get_hamming_weight_q<field::GF2_256>(const field::GF2_256* q, field::GF2_256* hamming_weight_q, int m);
+
+template bool verify_hamming_weight<field::GF2_256>(int hamming_weight,
+                           const uint8_t* hamming_weight_vec,
+                           const field::GF2_256* hamming_weight_v, const field::GF2_256* q, field::GF2_256 delta,
+                           int m);

@@ -1,7 +1,5 @@
-# Hash-Based-BAPS
-
 ## Introduction
-This project is an implementation of hash-based BAPS via the VOLEitH techniques.
+This project is an implementation of Signature via the VOLEitH techniques.
 
 ## Environment Requirements
 
