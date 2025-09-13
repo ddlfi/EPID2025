@@ -8,8 +8,6 @@
 #include "compat.h"
 #include "macros.h"
 
-#define GET_BIT(value, bit_pos) (((value) >> (bit_pos)) & 1)
-
 FAEST_BEGIN_C_DECL
 
 static inline void xor_u8_array(const uint8_t* a, const uint8_t* b, uint8_t* out, size_t len) {

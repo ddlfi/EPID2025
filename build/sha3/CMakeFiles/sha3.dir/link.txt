@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsha3.a CMakeFiles/sha3.dir/KeccakHash.c.o CMakeFiles/sha3.dir/KeccakHashtimes4.c.o CMakeFiles/sha3.dir/KeccakSponge.c.o CMakeFiles/sha3.dir/KeccakSpongetimes4.c.o CMakeFiles/sha3.dir/plain32/KeccakP-1600-inplace32BI.c.o CMakeFiles/sha3.dir/plain32/KeccakP-1600-times4-on1.c.o
+/usr/bin/ranlib libsha3.a

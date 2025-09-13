@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 FAEST_BEGIN_C_DECL
 
@@ -22,6 +23,13 @@ typedef uint64_t bf64_t;
 typedef uint64_t bf128_t ATTR_VECTOR_SIZE(16);
 typedef uint64_t bf192_t ATTR_VECTOR_SIZE(32);
 typedef uint64_t bf256_t ATTR_VECTOR_SIZE(32);
+
+
+ATTR_PURE ATTR_ALWAYS_INLINE
+static inline bool bf128_equals(bf128_t a, bf128_t b) {
+    return (BF_VALUE(a, 0) == BF_VALUE(b, 0)) && 
+           (BF_VALUE(a, 1) == BF_VALUE(b, 1));
+}
 
 #define BF128_ALIGN 16
 #define BF192_ALIGN 32

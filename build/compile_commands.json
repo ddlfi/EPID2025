@@ -1,0 +1,107 @@
+[
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/aes.c.o -c /home/lzm/code/Signature/src/aes.c",
+  "file": "/home/lzm/code/Signature/src/aes.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/aes_prove.c.o -c /home/lzm/code/Signature/src/aes_prove.c",
+  "file": "/home/lzm/code/Signature/src/aes_prove.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/compat.c.o -c /home/lzm/code/Signature/src/compat.c",
+  "file": "/home/lzm/code/Signature/src/compat.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/c++  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2 -o CMakeFiles/cases_test.dir/src/epid.cpp.o -c /home/lzm/code/Signature/src/epid.cpp",
+  "file": "/home/lzm/code/Signature/src/epid.cpp"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/c++  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2 -o CMakeFiles/cases_test.dir/src/field_GF2_128.cpp.o -c /home/lzm/code/Signature/src/field_GF2_128.cpp",
+  "file": "/home/lzm/code/Signature/src/field_GF2_128.cpp"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/c++  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2 -o CMakeFiles/cases_test.dir/src/field_GF2_256.cpp.o -c /home/lzm/code/Signature/src/field_GF2_256.cpp",
+  "file": "/home/lzm/code/Signature/src/field_GF2_256.cpp"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/c++  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2 -o CMakeFiles/cases_test.dir/src/field_templates.cpp.o -c /home/lzm/code/Signature/src/field_templates.cpp",
+  "file": "/home/lzm/code/Signature/src/field_templates.cpp"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/fields.c.o -c /home/lzm/code/Signature/src/fields.c",
+  "file": "/home/lzm/code/Signature/src/fields.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/c++  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2 -o CMakeFiles/cases_test.dir/src/main.cpp.o -c /home/lzm/code/Signature/src/main.cpp",
+  "file": "/home/lzm/code/Signature/src/main.cpp"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/random_oracle.c.o -c /home/lzm/code/Signature/src/random_oracle.c",
+  "file": "/home/lzm/code/Signature/src/random_oracle.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/randomness.c.o -c /home/lzm/code/Signature/src/randomness.c",
+  "file": "/home/lzm/code/Signature/src/randomness.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/universal_hashing.c.o -c /home/lzm/code/Signature/src/universal_hashing.c",
+  "file": "/home/lzm/code/Signature/src/universal_hashing.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/vc.c.o -c /home/lzm/code/Signature/src/vc.c",
+  "file": "/home/lzm/code/Signature/src/vc.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99 -o CMakeFiles/cases_test.dir/src/vole.c.o -c /home/lzm/code/Signature/src/vole.c",
+  "file": "/home/lzm/code/Signature/src/vole.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build",
+  "command": "/usr/bin/c++  -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2 -o CMakeFiles/cases_test.dir/src/witness_prove.cpp.o -c /home/lzm/code/Signature/src/witness_prove.cpp",
+  "file": "/home/lzm/code/Signature/src/witness_prove.cpp"
+},
+{
+  "directory": "/home/lzm/code/Signature/build/sha3",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -std=gnu99 -o CMakeFiles/sha3.dir/KeccakHash.c.o -c /home/lzm/code/Signature/sha3/KeccakHash.c",
+  "file": "/home/lzm/code/Signature/sha3/KeccakHash.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build/sha3",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -std=gnu99 -o CMakeFiles/sha3.dir/KeccakHashtimes4.c.o -c /home/lzm/code/Signature/sha3/KeccakHashtimes4.c",
+  "file": "/home/lzm/code/Signature/sha3/KeccakHashtimes4.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build/sha3",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -std=gnu99 -o CMakeFiles/sha3.dir/KeccakSponge.c.o -c /home/lzm/code/Signature/sha3/KeccakSponge.c",
+  "file": "/home/lzm/code/Signature/sha3/KeccakSponge.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build/sha3",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -std=gnu99 -o CMakeFiles/sha3.dir/KeccakSpongetimes4.c.o -c /home/lzm/code/Signature/sha3/KeccakSpongetimes4.c",
+  "file": "/home/lzm/code/Signature/sha3/KeccakSpongetimes4.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build/sha3",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -std=gnu99 -o CMakeFiles/sha3.dir/plain32/KeccakP-1600-inplace32BI.c.o -c /home/lzm/code/Signature/sha3/plain32/KeccakP-1600-inplace32BI.c",
+  "file": "/home/lzm/code/Signature/sha3/plain32/KeccakP-1600-inplace32BI.c"
+},
+{
+  "directory": "/home/lzm/code/Signature/build/sha3",
+  "command": "/usr/bin/cc  -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include -O3 -DNDEBUG -fcommon -mfma -std=gnu99 -o CMakeFiles/sha3.dir/plain32/KeccakP-1600-times4-on1.c.o -c /home/lzm/code/Signature/sha3/plain32/KeccakP-1600-times4-on1.c",
+  "file": "/home/lzm/code/Signature/sha3/plain32/KeccakP-1600-times4-on1.c"
+}
+]
