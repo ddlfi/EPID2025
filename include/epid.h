@@ -13,6 +13,11 @@
 #include "universal_hashing.h"
 #include "utils.h"
 #include "vole.h"
+
+// Forward declarations for 256-bit functions
+void hash_func_256(const std::vector<uint8_t>& m_1,
+                   const std::vector<uint8_t>& m_2, std::vector<uint8_t>& out);
+int hash_1_256(const uint8_t* key, const uint8_t* input, uint8_t* output);
 struct signature_t {
     std::vector<uint8_t> iv;
     std::vector<uint8_t> c;
@@ -27,17 +32,16 @@ struct signature_t {
     std::vector<uint8_t> t;
     std::vector<uint8_t> r;
 
-    // // for debug
-    // std::vector<uint8_t> chall_2;
-    // std::vector<uint8_t> chall_1;
-    // std::vector<uint8_t> A_0_tilde_bytes;
-    // std::vector<bf128_t> a_0_vec;
-    // std::vector<bf128_t> a_1_vec;
-    // std::vector<bf128_t> a_2_vec;
-    // std::vector<bf128_t> a_0_vec_test;
-    // std::vector<bf128_t> a_1_vec_test;
-    // std::vector<uint8_t> witness;
-    
+    // for debug
+    std::vector<uint8_t> chall_2;
+    std::vector<uint8_t> chall_1;
+    std::vector<uint8_t> A_0_tilde_bytes;
+    std::vector<bf128_t> a_0_vec;
+    std::vector<bf128_t> a_1_vec;
+    std::vector<bf128_t> a_2_vec;
+    std::vector<bf128_t> a_0_vec_test;
+    std::vector<bf128_t> a_1_vec_test;
+    std::vector<uint8_t> witness;
 
     // Destructor to clean up dynamically allocated memory
     ~signature_t() {
@@ -60,8 +64,9 @@ class epid {  // a class to simulate the sign / verify process of our EPID
    public:
     epid(int lambda, int k0, int k1, int tau0, int tau1, int tau,
          unsigned int member_num, unsigned int test_srl_size)
-        : lambda_(lambda), lambda_bytes_(lambda / 8) {
+        : lambda_(2 * lambda), lambda_bytes_(2 * lambda / 8) {
         params_.lambda = lambda;
+        params_.lambda_bytes = lambda / 8;
         params_.k1 = k1;
         params_.k0 = k0;
         params_.tau0 = tau0;
@@ -155,7 +160,11 @@ class epid {  // a class to simulate the sign / verify process of our EPID
     void gen_challenge();
     void gen_x();
     void cal_t(const std::vector<uint8_t>& sk, const std::vector<uint8_t>& c_i);
+    void cal_t_256(const std::vector<uint8_t>& sk,
+                   const std::vector<uint8_t>& c_i);
     void gen_tree();
+
+    void generate_srl_256(unsigned int srl_size);
 
    private:
     int ell_ = 0;
@@ -171,10 +180,12 @@ class epid {  // a class to simulate the sign / verify process of our EPID
     // SRL (Signature Revocation List)
     std::vector<signature_t> srl;
 
-    const std::vector<uint8_t> s_0_ = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00};
-    const std::vector<uint8_t> s_1_ = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00};
+    const std::vector<uint8_t> s_0_ = {
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const std::vector<uint8_t> s_1_ = {
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 };

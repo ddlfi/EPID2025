@@ -35,11 +35,16 @@ int aes128_init_round_keys(aes_round_keys_t* round_key, const uint8_t* key);
 int aes128_encrypt_block(const aes_round_keys_t* key, const uint8_t* plaintext,
                          uint8_t* ciphertext);
 
+int rijndael256_init_round_keys(aes_round_keys_t* round_key, const uint8_t* key);
+
+int rijndael256_encrypt_block(const aes_round_keys_t* key, const uint8_t* plaintext,
+                              uint8_t* ciphertext);
+
 void aes_increment_iv(uint8_t* iv);
 
 void aes_extend_witness(const uint8_t* key, const uint8_t* in, uint8_t* w,
                         bool origin_key_flag, bool round_key_flag,
-                        bool out_flag);
+                        bool out_flag, unsigned int lambda);
 
 int expand_key(aes_round_keys_t* round_keys, const uint8_t* key,
                    unsigned int key_words, unsigned int block_words,

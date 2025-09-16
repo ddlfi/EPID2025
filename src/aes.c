@@ -233,6 +233,18 @@ int aes128_init_round_keys(aes_round_keys_t* round_key, const uint8_t* key) {
                       ROUNDS_128);
 }
 
+int rijndael192_init_round_keys(aes_round_keys_t* round_key,
+                                const uint8_t* key) {
+    return expand_key(round_key, key, KEY_WORDS_192, RIJNDAEL_BLOCK_WORDS_192,
+                      ROUNDS_192);
+}
+
+int rijndael256_init_round_keys(aes_round_keys_t* round_key,
+                                const uint8_t* key) {
+    return expand_key(round_key, key, KEY_WORDS_256, RIJNDAEL_BLOCK_WORDS_256,
+                      ROUNDS_256);
+}
+
 static void load_state(aes_block_t state, const uint8_t* src,
                        unsigned int block_words) {
     for (unsigned int i = 0; i != block_words * 4; ++i) {
@@ -278,6 +290,26 @@ int aes128_encrypt_block(const aes_round_keys_t* key, const uint8_t* plaintext,
     return ret;
 }
 
+int rijndael192_encrypt_block(const aes_round_keys_t* key,
+                              const uint8_t* plaintext, uint8_t* ciphertext) {
+    aes_block_t state;
+    load_state(state, plaintext, RIJNDAEL_BLOCK_WORDS_192);
+    const int ret =
+        aes_encrypt(key, state, RIJNDAEL_BLOCK_WORDS_192, ROUNDS_192);
+    store_state(ciphertext, state, RIJNDAEL_BLOCK_WORDS_192);
+    return ret;
+}
+
+int rijndael256_encrypt_block(const aes_round_keys_t* key,
+                              const uint8_t* plaintext, uint8_t* ciphertext) {
+    aes_block_t state;
+    load_state(state, plaintext, RIJNDAEL_BLOCK_WORDS_256);
+    const int ret =
+        aes_encrypt(key, state, RIJNDAEL_BLOCK_WORDS_256, ROUNDS_256);
+    store_state(ciphertext, state, RIJNDAEL_BLOCK_WORDS_256);
+    return ret;
+}
+
 void prg(const uint8_t* key, const uint8_t* iv, uint8_t* out,
          unsigned int seclvl, size_t outlen) {
     const EVP_CIPHER* cipher;
@@ -313,26 +345,49 @@ void prg(const uint8_t* key, const uint8_t* iv, uint8_t* out,
 
 void aes_extend_witness(const uint8_t* key, const uint8_t* in, uint8_t* w,
                         bool origin_key_flag, bool round_key_flag,
-                        bool out_flag) {
-    const unsigned int lambda = 128;
-    const unsigned int S_ke = 40;
-    const unsigned int num_rounds = 10;
-    const unsigned int block_words = 4;
+                        bool out_flag, unsigned int lambda) {
+    unsigned int S_ke;
+    unsigned int num_rounds;
+    unsigned int block_words;
 
     aes_round_keys_t round_keys;
-    aes128_init_round_keys(&round_keys, key);
+
+    switch (lambda) {
+        case 256:
+            S_ke = 112;
+            block_words = RIJNDAEL_BLOCK_WORDS_256;
+            num_rounds = ROUNDS_256;
+            rijndael256_init_round_keys(&round_keys, key);
+            break;
+        case 192:
+            S_ke = 48;
+            block_words = RIJNDAEL_BLOCK_WORDS_192;
+            num_rounds = ROUNDS_192;
+            rijndael192_init_round_keys(&round_keys, key);
+            break;
+        default:
+            S_ke = 40;
+            block_words = AES_BLOCK_WORDS;
+            num_rounds = ROUNDS_128;
+            aes128_init_round_keys(&round_keys, key);
+            break;
+    }
     if (origin_key_flag) {
-        for (unsigned int i = 0; i < 4; ++i) {
-            memcpy(w, round_keys.round_keys[i / 4][i % 4], sizeof(aes_word_t));
+        unsigned int key_words = (lambda == 192) ? 6 : (lambda == 256) ? 8 : 4;
+        for (unsigned int i = 0; i < key_words; ++i) {
+            memcpy(w, round_keys.round_keys[i / key_words][i % key_words],
+                   sizeof(aes_word_t));
             w += sizeof(aes_word_t);
         }
     }
     if (round_key_flag) {
-        for (unsigned int j = 0, ik = 4; j < S_ke / 4; ++j) {
-            memcpy(w, round_keys.round_keys[ik / 4][ik % 4],
-                   sizeof(aes_word_t));
+        unsigned int key_words = (lambda == 192) ? 6 : (lambda == 256) ? 8 : 4;
+        unsigned int step = (lambda == 192) ? 6 : 4;
+        unsigned int start_ik = (lambda == 192) ? 6 : (lambda == 256) ? 8 : 4;
+        for (unsigned int j = 0, ik = start_ik; j < S_ke / 4; ++j) {
+            memcpy(w, round_keys.round_keys[ik / key_words][ik % key_words], sizeof(aes_word_t));
             w += sizeof(aes_word_t);
-            ik += 4;
+            ik += step;
         }
     }
     aes_block_t state;

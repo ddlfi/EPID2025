@@ -1,6 +1,0 @@
-/home/lzm/code/Signature/build/CMakeFiles/cases_test.dir
-/home/lzm/code/Signature/build/CMakeFiles/edit_cache.dir
-/home/lzm/code/Signature/build/CMakeFiles/rebuild_cache.dir
-/home/lzm/code/Signature/build/sha3/CMakeFiles/sha3.dir
-/home/lzm/code/Signature/build/sha3/CMakeFiles/edit_cache.dir
-/home/lzm/code/Signature/build/sha3/CMakeFiles/rebuild_cache.dir

@@ -67,6 +67,7 @@ faest_paramset_t ATTR_CONST faest_get_paramset(faest_paramid_t paramid);
 
 typedef struct paramset_t{
   unsigned int lambda;
+  unsigned int lambda_bytes;
   unsigned int tau;          
   unsigned int tau0;         
   unsigned int tau1;         

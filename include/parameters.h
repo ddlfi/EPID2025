@@ -5,12 +5,13 @@
 
 #pragma once
 
+#define MERKLE_TREE_128 1984 //for convenience of implementation 
 
-#define MERKLE_TREE_128 1984
+#define MERKLE_TREE_256 5248
 
-#define AES_128_1 1728  //AES witness : origin key, round key, mid state, out
+#define AES_128_1 1728  // AES witness : origin key, round key, mid state, out
 
-#define AES_128_2 1280      //AES witness : mid state, out
+#define AES_128_2 1280  // AES witness : mid state, out
 
 #define FAEST_128F_BETA 1
 
@@ -201,8 +202,6 @@
 #define FAEST_256F_SIG_SIZE 28400
 
 #define FAEST_256F_SK_SIZE 64
-
-#define FAEST_256F_Senc 224
 
 #define FAEST_256F_Ske 52
 
@@ -491,4 +490,3 @@
 #define FAEST_EM_256S_T1 8
 
 #define FAEST_EM_256S_TAU 22
-
