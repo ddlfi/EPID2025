@@ -6,5 +6,5 @@ C_DEFINES =
 
 C_INCLUDES = -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include
 
-C_FLAGS = -O3 -DNDEBUG -fcommon -mfma -std=gnu99
+C_FLAGS = -O3 -DNDEBUG -march=native -mtune=native -flto -fcommon -mfma -mpclmul -msse2 -mavx2 -maes -std=gnu99
 

@@ -7,11 +7,11 @@ C_DEFINES =
 
 C_INCLUDES = -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include
 
-C_FLAGS = -O3 -DNDEBUG -fcommon -mfma -mavx2 -std=gnu99
+C_FLAGS = -O3 -DNDEBUG -march=native -mtune=native -flto -fcommon -mfma -mpclmul -msse2 -mavx2 -maes -std=gnu99
 
 CXX_DEFINES = 
 
 CXX_INCLUDES = -I/home/lzm/code/Signature/include -I/home/lzm/code/Signature/sha3 -I/home/lzm/code/Signature/sha3/armv8a-neon -I/home/lzm/code/Signature/sha3/avx2 -I/home/lzm/code/Signature/sha3/opt64 -I/home/lzm/code/Signature/sha3/plain32 -I/home/lzm/code/Signature/sha3/../include
 
-CXX_FLAGS = -std=c++17 -mfma -mpclmul -msse2 -O3 -DNDEBUG -fcommon -mfma -mavx2
+CXX_FLAGS = -O3 -DNDEBUG -march=native -mtune=native -flto -fcommon -mfma -mpclmul -msse2 -mavx2 -maes
 
