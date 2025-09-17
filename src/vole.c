@@ -15,7 +15,8 @@
 #include "vole.h"
 
 #if !defined(FAEST_TESTS)
-static
+// Make ConvertToVole available for parallel version
+// static
 #endif
     void
     ConvertToVole(const uint8_t* iv, const uint8_t* sd, bool sd0_bot,

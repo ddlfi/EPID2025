@@ -5,6 +5,7 @@
 #include <random>
 
 #include "witness_prove.hpp"
+#include "vole_parallel.h"
 
 // Global fast random number generator - initialized once
 static std::mt19937 global_rng(std::random_device{}());
@@ -432,7 +433,8 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     const unsigned int ell_hat =
         ell + params_.lambda * 3 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
-    auto time_1 = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "\n=== EPID Sign Performance Analysis ===" << std::endl;
 
     std::vector<uint8_t> mu(2 * params_.lambda_bytes);
     hash_mu(msg, mu);
@@ -450,9 +452,19 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
         V[i] = V[0] + i * ell_hat_bytes;
     }
 
+    auto t1 = std::chrono::high_resolution_clock::now();
     sig->c.resize((params_.tau - 1) * ell_hat_bytes);
-    vole_commit(rootkey.data(), sig->iv.data(), ell_hat, &(params_),
-                hcom.data(), vecCom.data(), sig->c.data(), u.data(), V.data());
+    
+    // 添加VOLE内部时间测量
+    auto vole_detailed_start = std::chrono::high_resolution_clock::now();
+    vole_commit_parallel(rootkey.data(), sig->iv.data(), ell_hat, &(params_),
+                        hcom.data(), vecCom.data(), sig->c.data(), u.data(), V.data());
+    auto vole_detailed_end = std::chrono::high_resolution_clock::now();
+    
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] vole_commit: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
     std::vector<uint8_t> chall_1(5 * params_.lambda_bytes + 8);
     hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, ell, params_.tau);
 
@@ -460,25 +472,50 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     vole_hash(sig->u_tilde.data(), chall_1.data(), u.data(), ell,
               params_.lambda);
 
+    t1 = std::chrono::high_resolution_clock::now();
     std::vector<uint8_t> h_v(params_.lambda_bytes * 2);
     {
+        // 为并行计算分配存储空间
+        std::vector<std::vector<uint8_t>> V_tilde_results(params_.lambda);
+        for (auto& v : V_tilde_results) {
+            v.resize(params_.lambda_bytes + UNIVERSAL_HASH_B);
+        }
+        
+        auto vole_start = std::chrono::high_resolution_clock::now();
+        // 并行计算所有vole_hash调用
+        #pragma omp parallel for schedule(static)
+        for (unsigned int i = 0; i < params_.lambda; ++i) {
+            vole_hash(V_tilde_results[i].data(), chall_1.data(), V[i], ell,
+                      params_.lambda);
+        }
+        auto vole_end = std::chrono::high_resolution_clock::now();
+        std::cout << "    [h_v] parallel vole_hash (" << params_.lambda 
+                  << " calls): " 
+                  << std::chrono::duration<double, std::milli>(vole_end - vole_start).count() 
+                  << " ms" << std::endl;
+        
+        auto h1_start = std::chrono::high_resolution_clock::now();
+        // 串行更新H1上下文
         H1_context_t h1_ctx_1;
         H1_init(&h1_ctx_1, params_.lambda);
-        std::vector<uint8_t> V_tilde(params_.lambda_bytes + UNIVERSAL_HASH_B);
-        for (unsigned int i = 0; i != params_.lambda; ++i) {
-            // Step 7
-            vole_hash(V_tilde.data(), chall_1.data(), V[i], ell,
-                      params_.lambda);
-            // Step 8
-            H1_update(&h1_ctx_1, V_tilde.data(),
+        for (unsigned int i = 0; i < params_.lambda; ++i) {
+            H1_update(&h1_ctx_1, V_tilde_results[i].data(),
                       params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
-        // Step: 8。
         H1_final(&h1_ctx_1, h_v.data(), params_.lambda_bytes * 2);
+        auto h1_end = std::chrono::high_resolution_clock::now();
+        std::cout << "    [h_v] H1_update/final: " 
+                  << std::chrono::duration<double, std::milli>(h1_end - h1_start).count() 
+                  << " ms" << std::endl;
     }
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] h_v computation (" << params_.lambda << " vole_hash calls): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
     std::vector<uint8_t> witness(ell_bytes, 0);
     unsigned int index = 0;
 
+    t1 = std::chrono::high_resolution_clock::now();
     // t = f(sk_i, r)
     sig->r.resize(lambda_bytes_);
     gen_random(sig->r);
@@ -499,13 +536,27 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
                        t_set[signer_index].data(), witness.data() + index / 8,
                        1, 1, 0, lambda_);
     index += 256 + 14 * 64 + 13 * 256;  // c_i_join + roundkeys + states
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] 3x aes_extend_witness calls: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
+    t1 = std::chrono::high_resolution_clock::now();
     // x_i accumulated in accumulator
     gen_witness_merkle_tree(witness.data() + index / 8, signer_index);
     index += (256 * 3 + 256 + 14 * 64 + 256 * 13) * log2(member_num_) + 256;
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] gen_witness_merkle_tree (height=" << log2(member_num_) << "): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
+    t1 = std::chrono::high_resolution_clock::now();
     srl_extend_witness(srl, skey_set[signer_index], witness.data() + index / 8,
                        lambda_);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] srl_extend_witness (" << srl.size() << " SRL entries): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
     sig->d.resize(ell_bytes);
     xor_u8_array(witness.data(), u.data(), sig->d.data(), ell_bytes);
@@ -527,10 +578,21 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     std::vector<bf128_t> a_1_vec_test;
     a_0_vec_test.resize(multi_num);
     a_1_vec_test.resize(multi_num);
+    
+    t1 = std::chrono::high_resolution_clock::now();
     bf128_t* bf_v = column_to_row_major_and_shrink_V_128(V.data(), ell_hat);
+    auto t1_5 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] column_to_row_major_and_shrink_V_128: " 
+              << std::chrono::duration<double, std::milli>(t1_5 - t1).count() 
+              << " ms" << std::endl;
+    
     witness_prove_256(witness.data(), bf_v, a_0_vec.data(), a_1_vec.data(),
                       a_2_vec.data(), chall_2.data(), lambda_, sig->t.data(),
                       sig->r.data(), log2(member_num_), ell_hat, srl);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] witness_prove_256: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1_5).count() 
+              << " ms" << std::endl;
 
     // Save a_0_vec, a_1_vec, a_2_vec to signature for verification
     bf128_t u_0_mask = bf128_load(u.data() + ell_bytes);
@@ -567,12 +629,10 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
         vec_com_clear(&vecCom[i]);
     }
 
-    auto time_2 = std::chrono::high_resolution_clock::now();
-
-    std::cout
-        << "total sign time is : "
-        << std::chrono::duration<double, std::milli>(time_2 - time_1).count()
-        << " ms" << std::endl;
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::cout << "=== EPID Sign Total Time: "
+              << std::chrono::duration<double, std::milli>(end_time - start_time).count()
+              << " ms ===\n" << std::endl;
     delete[] V[0];
     faest_aligned_free(bf_v);
 }
@@ -589,7 +649,10 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     const unsigned int ell_hat =
         ell + params_.lambda * 3 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
-    auto time_1 = std::chrono::high_resolution_clock::now();
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "\n=== EPID Verify Performance Analysis ===" << std::endl;
+    
     std::vector<uint8_t> mu(2 * params_.lambda_bytes);
     hash_mu(msg, mu);
 
@@ -599,8 +662,14 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     for (unsigned int i = 1; i < params_.lambda; ++i) {
         Q[i] = Q[0] + i * ell_hat_bytes;
     }
+    
+    auto t1 = std::chrono::high_resolution_clock::now();
     vole_reconstruct(sig->iv.data(), sig->chall_3.data(), sig->pdec.data(),
                      sig->com.data(), hcom.data(), Q.data(), ell_hat, &params_);
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] vole_reconstruct: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
     std::vector<uint8_t> chall_1(5 * params_.lambda_bytes + 8);
     hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, ell, params_.tau);
@@ -620,6 +689,7 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     memset(Dtilde[0], 0,
            params_.lambda * (params_.lambda_bytes + UNIVERSAL_HASH_B));
 
+    t1 = std::chrono::high_resolution_clock::now();
     unsigned int Dtilde_idx = 0;
     unsigned int q_idx = 0;
     for (unsigned int i = 0; i < params_.tau; i++) {
@@ -651,23 +721,54 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
             }
         }
     }
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] Q matrix processing (" << params_.tau << " iterations): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
+    t1 = std::chrono::high_resolution_clock::now();
     std::vector<uint8_t> h_v(params_.lambda_bytes * 2);
     {
+        // 为并行计算分配存储空间
+        std::vector<std::vector<uint8_t>> Q_tilde_results(params_.lambda);
+        for (auto& q : Q_tilde_results) {
+            q.resize(params_.lambda_bytes + UNIVERSAL_HASH_B);
+        }
+        
+        auto vole_start = std::chrono::high_resolution_clock::now();
+        // 并行计算所有vole_hash和xor操作
+        #pragma omp parallel for schedule(static)
+        for (unsigned int i = 0; i < params_.lambda; i++) {
+            vole_hash(Q_tilde_results[i].data(), chall_1.data(), Q_[i], ell,
+                      params_.lambda);
+            xor_u8_array(Q_tilde_results[i].data(), Dtilde[i], Q_tilde_results[i].data(),
+                         params_.lambda_bytes + UNIVERSAL_HASH_B);
+        }
+        auto vole_end = std::chrono::high_resolution_clock::now();
+        std::cout << "    [h_v] parallel vole_hash+xor (" << params_.lambda 
+                  << " calls): " 
+                  << std::chrono::duration<double, std::milli>(vole_end - vole_start).count() 
+                  << " ms" << std::endl;
+        
+        auto h1_start = std::chrono::high_resolution_clock::now();
+        // 串行更新H1上下文
         H1_context_t h1_ctx_1;
         H1_init(&h1_ctx_1, params_.lambda);
-        std::vector<uint8_t> Q_tilde(params_.lambda_bytes + UNIVERSAL_HASH_B);
         for (unsigned int i = 0; i < params_.lambda; i++) {
-            vole_hash(Q_tilde.data(), chall_1.data(), Q_[i], ell,
-                      params_.lambda);
-            xor_u8_array(Q_tilde.data(), Dtilde[i], Q_tilde.data(),
-                         params_.lambda_bytes + UNIVERSAL_HASH_B);
-            H1_update(&h1_ctx_1, Q_tilde.data(),
+            H1_update(&h1_ctx_1, Q_tilde_results[i].data(),
                       params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
         H1_final(&h1_ctx_1, h_v.data(), params_.lambda_bytes * 2);
+        auto h1_end = std::chrono::high_resolution_clock::now();
+        std::cout << "    [h_v] H1_update/final: " 
+                  << std::chrono::duration<double, std::milli>(h1_end - h1_start).count() 
+                  << " ms" << std::endl;
     }
     delete[] Dtilde[0];
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] h_v computation (" << params_.lambda << " vole_hash calls): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
     std::vector<uint8_t> chall_2(3 * params_.lambda_bytes + 8);
     hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d,
@@ -689,11 +790,21 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
 
     std::vector<bf128_t> b_vec(multi_num);
     std::vector<bf128_t> b_vec_test(multi_num);
+    
+    t1 = std::chrono::high_resolution_clock::now();
     bf128_t* bf_q = column_to_row_major_and_shrink_V_128(Q_.data(), ell_hat);
+    auto t1_5 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] column_to_row_major_and_shrink_V_128: " 
+              << std::chrono::duration<double, std::milli>(t1_5 - t1).count() 
+              << " ms" << std::endl;
 
     witness_verify_256(bf_q, sig->chall_3.data(), b_vec.data(), lambda_,
                        sig->t.data(), sig->r.data(), log2(member_num_), ell_hat,
                        srl);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] witness_verify_256: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1_5).count() 
+              << " ms" << std::endl;
 
     bf128_t bf_delta = bf128_load(sig->chall_3.data());
 
@@ -716,12 +827,10 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     hash_challenge_3(chall_3, chall_2, A_0_tilde_bytes, sig->A_1_tilde_bytes,
                      sig->A_2_tilde_bytes, params_.lambda);
 
-    auto time_2 = std::chrono::high_resolution_clock::now();
-
-    std::cout
-        << "total verify time is : "
-        << std::chrono::duration<double, std::milli>(time_2 - time_1).count()
-        << " ms" << std::endl;
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::cout << "=== EPID Verify Total Time: "
+              << std::chrono::duration<double, std::milli>(end_time - start_time).count()
+              << " ms ===\n" << std::endl;
 
     delete[] Q[0];
     delete[] Q_[0];

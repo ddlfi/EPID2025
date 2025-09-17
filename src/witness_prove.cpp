@@ -5,6 +5,8 @@
 #include "epid.h"
 #include "parameters.h"
 #include "utils.h"
+#include <chrono>
+#include <iostream>
 
 // SRL prove function using signature_t
 static void srl_prove_128(const uint8_t* w, const bf128_t* bf_v,
@@ -646,42 +648,76 @@ void witness_prove_256(const uint8_t* w, const bf128_t* bf_v, bf128_t* a_0_vec,
                        unsigned int lambda, uint8_t* t, uint8_t* r,
                        unsigned int height, unsigned int ell_hat,
                        const std::vector<signature_t>& srl) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "  [WitnessProve256] Starting..." << std::endl;
+    
     unsigned int index = 0;
     uint8_t* k = (uint8_t*)malloc((14 + 1) * 256 / 8);
     bf128_t* vk = (bf128_t*)faest_aligned_alloc(
         BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
 
+    auto t1 = std::chrono::high_resolution_clock::now();
     // t = f(sk_i, r)
     rijnd_prove_256(w, bf_v, r, t, a_0_vec, a_1_vec, a_2_vec, true, k, vk,
                     false, false);
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessProve256] rijnd_prove_256 #1: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
     index += 256 + 14 * 64 + 13 * 256;
     // t_i_join = f(sk_i,c_i)
+    t1 = std::chrono::high_resolution_clock::now();
     rijnd_prove_256(w + index / 8, bf_v + index,
                     w + (index + 13 * 256 + 256) / 8,
                     w + (index + 13 * 256) / 8, a_0_vec + 1120, a_1_vec + 1120,
                     a_2_vec + 1120, false, k, vk, true, true);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessProve256] rijnd_prove_256 #2: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
+    
     index += 13 * 256 + 256;  // states + rijnd_out
     // x_i = f(c_i,t_i_join)
 
+    t1 = std::chrono::high_resolution_clock::now();
     leave_prove_256(w + (index - 256) / 8, bf_v + (index - 256), a_0_vec + 2016,
                     a_1_vec + 2016, a_2_vec + 2016);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessProve256] leave_prove_256: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
     index += 256 + 14 * 64 + 13 * 256;
 
     // Merkle tree prove
+    t1 = std::chrono::high_resolution_clock::now();
     merkle_tree_prove_256(w + index / 8, bf_v + index, a_0_vec + 3136,
                           a_1_vec + 3136, a_2_vec + 3136, height);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessProve256] merkle_tree_prove_256 (height=" << height << "): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
     index += (256 * 3 + 256 + 14 * 64 + 256 * 13) * height + 256;
 
     // SRL prove
     if (!srl.empty()) {
+        t1 = std::chrono::high_resolution_clock::now();
         srl_prove_256(w + index / 8, bf_v + index,
                       a_0_vec + 3136 + 1120 * height,
                       a_1_vec + 3136 + 1120 * height,
                       a_2_vec + 3136 + 1120 * height, lambda, k, vk, srl);
+        t2 = std::chrono::high_resolution_clock::now();
+        std::cout << "    [WitnessProve256] srl_prove_256 (" << srl.size() << " entries): " 
+                  << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+                  << " ms" << std::endl;
     }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::cout << "  [WitnessProve256] Total: " 
+              << std::chrono::duration<double, std::milli>(end_time - start_time).count() 
+              << " ms" << std::endl;
 
     faest_aligned_free(vk);
     free(k);
@@ -692,51 +728,63 @@ void witness_verify_256(const bf128_t* bf_q, const uint8_t* delta,
                         const uint8_t* r, unsigned int height,
                         unsigned int ell_hat,
                         const std::vector<signature_t>& srl) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "  [WitnessVerify256] Starting..." << std::endl;
+    
     unsigned int index = 0;
     bf128_t* qk = (bf128_t*)faest_aligned_alloc(
         BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
 
-    // 1. 第一个验证步骤 - 必须先执行来初始化qk
+    auto t1 = std::chrono::high_resolution_clock::now();
     rijnd_verify_256(bf_q, delta, r, t, b_vec, true, qk, false, false);
     index += 256 + 14 * 64 + 13 * 256;
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessVerify256] rijnd_verify_256 #1: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
-    // 预计算其他步骤的索引
-    unsigned int index_2 = index + 13 * 256 + 256;
-    unsigned int index_3 = index_2 + 256 + 14 * 64 + 13 * 256;
-    unsigned int index_4 =
-        index_3 + (256 * 3 + 256 + 14 * 64 + 256 * 13) * height + 256;
+    t1 = std::chrono::high_resolution_clock::now();
+    rijnd_verify_256(bf_q + index, delta, nullptr, nullptr,
+                     b_vec + 1120, false, qk, true, true);
+    index += 13 * 256 + 256;
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessVerify256] rijnd_verify_256 #2: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
-// 2-5. 后面的步骤可以并行执行
-#pragma omp parallel sections
-    {
-#pragma omp section
-        {
-            // t_i_join验证
-            rijnd_verify_256(bf_q + index, delta, nullptr, nullptr,
-                             b_vec + 1120, false, qk, true, true);
-        }
+    t1 = std::chrono::high_resolution_clock::now();
+    leave_verify_256(bf_q + (index - 256), delta, b_vec + 2016);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessVerify256] leave_verify_256: " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
-#pragma omp section
-        {
-            // x_i验证
-            leave_verify_256(bf_q + (index_2 - 256), delta, b_vec + 2016);
-        }
+    index += 256 + 14 * 64 + 13 * 256;
 
-#pragma omp section
-        {
-            // Merkle tree验证
-            merkle_tree_verify_256(bf_q + index_3, delta, b_vec + 3136, height);
-        }
+    t1 = std::chrono::high_resolution_clock::now();
+    merkle_tree_verify_256(bf_q + index, delta, b_vec + 3136, height);
+    t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "    [WitnessVerify256] merkle_tree_verify_256 (height=" << height << "): " 
+              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+              << " ms" << std::endl;
 
-#pragma omp section
-        {
-            // SRL验证
-            if (!srl.empty()) {
-                srl_verify_256(bf_q + index_4, delta,
-                               b_vec + 3136 + 1120 * height, lambda, qk, srl);
-            }
-        }
+    index += (256 * 3 + 256 + 14 * 64 + 256 * 13) * height + 256;
+
+    // SRL verify
+    if (!srl.empty()) {
+        t1 = std::chrono::high_resolution_clock::now();
+        srl_verify_256(bf_q + index, delta, b_vec + 3136 + 1120 * height, lambda,
+                       qk, srl);
+        t2 = std::chrono::high_resolution_clock::now();
+        std::cout << "    [WitnessVerify256] srl_verify_256 (" << srl.size() << " entries): " 
+                  << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+                  << " ms" << std::endl;
     }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::cout << "  [WitnessVerify256] Total: " 
+              << std::chrono::duration<double, std::milli>(end_time - start_time).count() 
+              << " ms" << std::endl;
 
     faest_aligned_free(qk);
 }
