@@ -119,13 +119,14 @@ bf128_t epid::zk_hash(const std::vector<uint8_t>& sd,
 
     bf128_t h_0 = bf128_zero();
     bf128_t h_1 = bf128_zero();
-
+    
+    // Use simple serial computation - precomputation was too expensive
     bf128_t s_muti = s;
     bf128_t t_muti = t;
-
-    for (auto& x_0_i : x_0) {
-        h_0 = bf128_add(h_0, bf128_mul(s_muti, x_0_i));
-        h_1 = bf128_add(h_1, bf128_mul(t_muti, x_0_i));
+    
+    for (size_t i = 0; i < x_0.size(); ++i) {
+        h_0 = bf128_add(h_0, bf128_mul(s_muti, x_0[i]));
+        h_1 = bf128_add(h_1, bf128_mul(t_muti, x_0[i]));
         s_muti = bf128_mul(s_muti, s);
         t_muti = bf128_mul(t_muti, t);
     }
@@ -133,6 +134,7 @@ bf128_t epid::zk_hash(const std::vector<uint8_t>& sd,
     bf128_t result = bf128_mul(r_0, h_0);
     result = bf128_add(result, bf128_mul(r_1, h_1));
     result = bf128_add(result, x_1);
+    
     return result;
 }
 
@@ -594,15 +596,35 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
               << std::chrono::duration<double, std::milli>(t2 - t1_5).count() 
               << " ms" << std::endl;
 
-    // Save a_0_vec, a_1_vec, a_2_vec to signature for verification
+    
+    // ZK hash operations
+    auto zk_start = std::chrono::high_resolution_clock::now();
     bf128_t u_0_mask = bf128_load(u.data() + ell_bytes);
     bf128_t u_1_mask = bf128_load(u.data() + ell_bytes + params_.lambda_bytes);
-    bf128_t a_0_tilde = zk_hash(chall_2, a_0_vec, bf128_sum_poly(bf_v + ell));
-    bf128_t a_1_tilde = zk_hash(
-        chall_2, a_1_vec,
-        bf128_add(u_0_mask, bf128_sum_poly(bf_v + ell + params_.lambda)));
-
-    bf128_t a_2_tilde = zk_hash(chall_2, a_2_vec, u_1_mask);
+    
+    bf128_t a_0_tilde, a_1_tilde, a_2_tilde;
+    
+    #pragma omp parallel sections num_threads(3)
+    {
+        #pragma omp section
+        {
+            a_0_tilde = zk_hash(chall_2, a_0_vec, bf128_sum_poly(bf_v + ell));
+        }
+        #pragma omp section
+        {
+            a_1_tilde = zk_hash(
+                chall_2, a_1_vec,
+                bf128_add(u_0_mask, bf128_sum_poly(bf_v + ell + params_.lambda)));
+        }
+        #pragma omp section
+        {
+            a_2_tilde = zk_hash(chall_2, a_2_vec, u_1_mask);
+        }
+    }
+    auto zk_end = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] ZK hash operations (3 calls): " 
+              << std::chrono::duration<double, std::milli>(zk_end - zk_start).count() 
+              << " ms" << std::endl;
 
     bf128_store(A_0_tilde_bytes.data(), a_0_tilde);
     bf128_store(sig->A_1_tilde_bytes.data(), a_1_tilde);
@@ -610,10 +632,17 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     sig->chall_3.resize(params_.lambda_bytes);
     sig->pdec.resize(params_.tau);
     sig->com.resize(params_.tau);
+    
+    auto hash3_start = std::chrono::high_resolution_clock::now();
     hash_challenge_3(sig->chall_3, chall_2, A_0_tilde_bytes,
                      sig->A_1_tilde_bytes, sig->A_2_tilde_bytes,
                      params_.lambda);
+    auto hash3_end = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] hash_challenge_3: " 
+              << std::chrono::duration<double, std::milli>(hash3_end - hash3_start).count() 
+              << " ms" << std::endl;
 
+    auto vector_open_start = std::chrono::high_resolution_clock::now();
     for (unsigned int i = 0; i < params_.tau; i++) {
         // Step 20
         uint8_t s_[12];
@@ -628,6 +657,10 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
                     depth, params_.lambda_bytes);
         vec_com_clear(&vecCom[i]);
     }
+    auto vector_open_end = std::chrono::high_resolution_clock::now();
+    std::cout << "[Sign] vector_open operations (" << params_.tau << " iterations): " 
+              << std::chrono::duration<double, std::milli>(vector_open_end - vector_open_start).count() 
+              << " ms" << std::endl;
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::cout << "=== EPID Sign Total Time: "
@@ -664,8 +697,8 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     }
     
     auto t1 = std::chrono::high_resolution_clock::now();
-    vole_reconstruct(sig->iv.data(), sig->chall_3.data(), sig->pdec.data(),
-                     sig->com.data(), hcom.data(), Q.data(), ell_hat, &params_);
+    vole_reconstruct_parallel(sig->iv.data(), sig->chall_3.data(), sig->pdec.data(),
+                               sig->com.data(), hcom.data(), Q.data(), ell_hat, &params_);
     auto t2 = std::chrono::high_resolution_clock::now();
     std::cout << "[Verify] vole_reconstruct: " 
               << std::chrono::duration<double, std::milli>(t2 - t1).count() 
@@ -806,6 +839,7 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
               << std::chrono::duration<double, std::milli>(t2 - t1_5).count() 
               << " ms" << std::endl;
 
+    auto zk_verify_start = std::chrono::high_resolution_clock::now();
     bf128_t bf_delta = bf128_load(sig->chall_3.data());
 
     bf128_t q_0 = bf128_sum_poly(bf_q + ell);
@@ -821,11 +855,20 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
                   bf128_add(b_tilde, bf128_mul(a_1_tilde, bf_delta)));
 
     bf128_store(A_0_tilde_bytes.data(), a_0_tilde);
+    auto zk_verify_end = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] ZK verification operations: " 
+              << std::chrono::duration<double, std::milli>(zk_verify_end - zk_verify_start).count() 
+              << " ms" << std::endl;
 
     std::vector<uint8_t> chall_3(params_.lambda_bytes);
 
+    auto final_hash_start = std::chrono::high_resolution_clock::now();
     hash_challenge_3(chall_3, chall_2, A_0_tilde_bytes, sig->A_1_tilde_bytes,
                      sig->A_2_tilde_bytes, params_.lambda);
+    auto final_hash_end = std::chrono::high_resolution_clock::now();
+    std::cout << "[Verify] final hash_challenge_3: " 
+              << std::chrono::duration<double, std::milli>(final_hash_end - final_hash_start).count() 
+              << " ms" << std::endl;
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::cout << "=== EPID Verify Total Time: "

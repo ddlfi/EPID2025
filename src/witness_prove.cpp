@@ -436,28 +436,33 @@ static void srl_prove_256(const uint8_t* w, const bf128_t* bf_v,
                           bf128_t* a_0_vec, bf128_t* a_1_vec, bf128_t* a_2_vec,
                           unsigned int lambda, uint8_t* k, bf128_t* vk,
                           const std::vector<signature_t>& srl_list) {
-    unsigned int offset = 0;
-    unsigned int a_vec_offset = 0;
-
-    for (auto& sig : srl_list) {
+    printf("    [SRL_PROVE] Processing %zu entries with parallel optimization\n", srl_list.size());
+    fflush(stdout);
+    
+    // Parallel processing of SRL list
+    #pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < srl_list.size(); i++) {
+        const auto& sig = srl_list[i];
+        
+        // Calculate offsets for this iteration (matching original logic)
+        unsigned int offset = i * (14 * 256 + 256);  // Each sig needs 14*256 + 256 bits
+        unsigned int a_vec_offset = i * (896 + (lambda - 1));  // Each sig needs 896 + (lambda-1) elements
+        
         // Rijndael prove: f(sk_i, r_j) with in_flag=0, out_flag=1
-        // r_j is public input, rijnd_out is secret
         rijnd_prove_256(w + offset / 8, bf_v + offset, sig.r.data(),
                         w + offset / 8 + 256 * 13 / 8, a_0_vec + a_vec_offset,
                         a_1_vec + a_vec_offset, a_2_vec + a_vec_offset, 0, k,
                         vk, 0, 1);
 
-        offset += 14 * 256;   // Rijndael witness size (in bits)
-        a_vec_offset += 896;  // Updated for 256-bit version
-
+        // Update offset after rijndael (matching original)
+        unsigned int rijndael_offset = offset + 14 * 256;
+        unsigned int rijndael_a_vec_offset = a_vec_offset + 896;
+        
         // OR prove: prove cumulative OR of d bits
-        or_prove_256(w + (offset - 256) / 8, bf_v + offset - 256,
-                     a_0_vec + a_vec_offset, a_1_vec + a_vec_offset,
-                     a_2_vec + a_vec_offset, lambda, sig.r.data(),
+        or_prove_256(w + (rijndael_offset - 256) / 8, bf_v + rijndael_offset - 256,
+                     a_0_vec + rijndael_a_vec_offset, a_1_vec + rijndael_a_vec_offset,
+                     a_2_vec + rijndael_a_vec_offset, lambda, sig.r.data(),
                      sig.t.data());
-
-        offset += 256;  // OR witness size (in bits) - updated for 256-bit
-        a_vec_offset += (lambda - 1);
     }
 }
 
@@ -465,24 +470,30 @@ static void srl_prove_256(const uint8_t* w, const bf128_t* bf_v,
 static void srl_verify_256(const bf128_t* bf_q, const uint8_t* delta,
                            bf128_t* b_vec, unsigned int lambda, bf128_t* qk,
                            const std::vector<signature_t>& srl_list) {
-    unsigned int witness_offset = 0;
-    unsigned int b_vec_offset = 0;
-
-    for (auto& sig : srl_list) {
+    printf("    [SRL_VERIFY] Processing %zu entries with parallel optimization\n", srl_list.size());
+    fflush(stdout);
+    
+    // Parallel processing of SRL list
+    #pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < srl_list.size(); i++) {
+        const auto& sig = srl_list[i];
+        
+        // Calculate offsets for this iteration (matching original logic)
+        unsigned int witness_offset = i * (14 * 256 + 256);  // Each sig needs 14*256 + 256 bits
+        unsigned int b_vec_offset = i * (896 + (lambda - 1));  // Each sig needs 896 + (lambda-1) elements
+        
         // Rijndael verify: f(sk_i, r_j) with in_flag=0, out_flag=1
         // r_j is public input, rijnd_out is secret
         rijnd_verify_256(bf_q + witness_offset, delta, sig.r.data(), nullptr,
                          b_vec + b_vec_offset, false, qk, false, true);
 
-        witness_offset += 14 * 256;  // Rijndael witness size for 256-bit
-        b_vec_offset += 896;         // Updated for 256-bit version
-
+        // Update offset after rijndael (matching original)
+        unsigned int rijndael_witness_offset = witness_offset + 14 * 256;
+        unsigned int rijndael_b_vec_offset = b_vec_offset + 896;
+        
         // OR verify: verify cumulative OR of d bits
-        or_verify_256(bf_q + witness_offset - 256, delta, b_vec + b_vec_offset,
+        or_verify_256(bf_q + rijndael_witness_offset - 256, delta, b_vec + rijndael_b_vec_offset,
                       lambda, sig.r.data(), sig.t.data());
-
-        witness_offset += 256;         // OR witness size (in bf128_t units)
-        b_vec_offset += (lambda - 1);  // OR constraints count
     }
 }
 
@@ -555,25 +566,29 @@ void leave_verify_256(const bf128_t* bf_q, const uint8_t* delta,
 void merkle_tree_prove_256(const uint8_t* w, const bf128_t* bf_v,
                            bf128_t* a_0_vec, bf128_t* a_1_vec, bf128_t* a_2_vec,
                            unsigned int height) {
-    uint8_t* k = (uint8_t*)malloc((14 + 1) * 256 / 8);
-    bf128_t* vk = (bf128_t*)faest_aligned_alloc(
-        BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
-    uint8_t* origin_key = (uint8_t*)malloc(256 / 8);
-    uint8_t* in = (uint8_t*)malloc(256 / 8);
-    uint8_t* out = (uint8_t*)malloc(256 / 8);
-    bf128_t* origin_key_v = (bf128_t*)malloc(256 * sizeof(bf128_t));
-    bf128_t* bf_in =
-        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-    bf128_t* bf_out =
-        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-
+    printf("    [MERKLE_PROVE] Processing height=%u with parallel optimization\n", height);
+    fflush(stdout);
+    
+    // Parallel processing of height levels
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < height; i++) {
+        // Each thread needs its own temporary variables
+        uint8_t* k = (uint8_t*)malloc((14 + 1) * 256 / 8);
+        bf128_t* vk = (bf128_t*)faest_aligned_alloc(
+            BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
+        uint8_t* origin_key = (uint8_t*)malloc(256 / 8);
+        uint8_t* in = (uint8_t*)malloc(256 / 8);
+        uint8_t* out = (uint8_t*)malloc(256 / 8);
+        bf128_t* origin_key_v = (bf128_t*)malloc(256 * sizeof(bf128_t));
+        bf128_t* bf_in = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+        bf128_t* bf_out = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+
+        // Process this level
         xor_u8_array(w + MERKLE_TREE_256 * i / 8,
                      w + MERKLE_TREE_256 * i / 8 + 3 * 32UL, origin_key, 32UL);
         xor_u8_array(w + MERKLE_TREE_256 * i / 8 + 32UL,
                      w + 3 * 32UL + MERKLE_TREE_256 * i / 8, in, 32UL);
-        xor_u8_array(w + MERKLE_TREE_256 / 8 + MERKLE_TREE_256 * i / 8, in, out,
-                     32UL);
+        xor_u8_array(w + MERKLE_TREE_256 / 8 + MERKLE_TREE_256 * i / 8, in, out, 32UL);
 
         for (int j = 0; j < 256; j++) {
             origin_key_v[j] =
@@ -595,29 +610,35 @@ void merkle_tree_prove_256(const uint8_t* w, const bf128_t* bf_v,
             bf_v + i * MERKLE_TREE_256 + 4 * 256 + 14 * 64, k, vk, bf_in,
             bf_out, a_0_vec + 1120 * i + 224, a_1_vec + 1120 * i + 224,
             a_2_vec + 1120 * i + 224, 1, 1);
-    }
 
-    faest_aligned_free(vk);
-    free(k);
-    free(origin_key);
-    free(in);
-    free(out);
-    free(origin_key_v);
-    faest_aligned_free(bf_in);
-    faest_aligned_free(bf_out);
+        // Cleanup thread-local variables
+        faest_aligned_free(vk);
+        free(k);
+        free(origin_key);
+        free(in);
+        free(out);
+        free(origin_key_v);
+        faest_aligned_free(bf_in);
+        faest_aligned_free(bf_out);
+    }
 }
 
 void merkle_tree_verify_256(const bf128_t* bf_q, const uint8_t* delta,
                             bf128_t* b_vec, unsigned int height) {
-    bf128_t* qk = (bf128_t*)faest_aligned_alloc(
-        BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
-    bf128_t* origin_key_q = (bf128_t*)malloc(256 * sizeof(bf128_t));
-    bf128_t* bf_in =
-        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-    bf128_t* bf_out =
-        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-
+    printf("    [MERKLE_VERIFY] Processing height=%u with parallel optimization\n", height);
+    fflush(stdout);
+    
+    // Parallel processing of height levels
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < height; i++) {
+        // Each thread needs its own temporary variables
+        bf128_t* qk = (bf128_t*)faest_aligned_alloc(
+            BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
+        bf128_t* origin_key_q = (bf128_t*)malloc(256 * sizeof(bf128_t));
+        bf128_t* bf_in = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+        bf128_t* bf_out = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+
+        // Process this level
         for (int j = 0; j < 256; j++) {
             origin_key_q[j] =
                 bf128_add(bf_q[j + MERKLE_TREE_256 * i],
@@ -635,12 +656,13 @@ void merkle_tree_verify_256(const bf128_t* bf_q, const uint8_t* delta,
         rijnd_enc_constraints_Mkey_1_256(
             NULL, NULL, bf_q + i * MERKLE_TREE_256 + 4 * 256 + 14 * 64, qk,
             delta, bf_in, bf_out, b_vec + 224 + i * 1120, 1, 1);
-    }
 
-    free(origin_key_q);
-    faest_aligned_free(bf_in);
-    faest_aligned_free(bf_out);
-    faest_aligned_free(qk);
+        // Cleanup thread-local variables
+        free(origin_key_q);
+        faest_aligned_free(bf_in);
+        faest_aligned_free(bf_out);
+        faest_aligned_free(qk);
+    }
 }
 
 void witness_prove_256(const uint8_t* w, const bf128_t* bf_v, bf128_t* a_0_vec,

@@ -30,5 +30,5 @@ void test_case(const std::vector<uint8_t>& msg, int lambda, int k0, int k1,
 int main() {
     std::vector<uint8_t> msg = {0x11, 0x22};
 
-    test_case(msg, 128, 12,11, 7, 4, 11, 1024, 1000);
+    test_case(msg, 128, 8,8, 0, 16, 16, 1024, 100);
 }

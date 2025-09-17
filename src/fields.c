@@ -9,6 +9,10 @@
 #include "fields.h"
 #include "randomness.h"
 
+#if defined(HAVE_ATTR_VECTOR_SIZE) && defined(__PCLMUL__)
+#include <immintrin.h>
+#endif
+
 // GF(2^8) with X^8 + X^4 + X^3 + X^1 + 1
 #define bf8_modulus (UINT8_C((1 << 4) | (1 << 3) | (1 << 1) | 1))
 // GF(2^64) with X^64 + X^4 + X^3 + X^1 + 1
@@ -181,6 +185,43 @@ static inline uint64_t bf128_bit_to_uint64_mask(bf128_t value, unsigned int bit)
 }
 
 bf128_t bf128_mul(bf128_t lhs, bf128_t rhs) {
+#if defined(HAVE_ATTR_VECTOR_SIZE) && defined(__PCLMUL__)
+  // Optimized PCLMULQDQ implementation matching original bf128_mul logic
+  __m128i a = (__m128i)lhs;
+  __m128i b = (__m128i)rhs;
+  
+  // Step 1: Carry-less multiplication (same as original algorithm conceptually)
+  __m128i tmp[2];
+  tmp[0] = _mm_clmulepi64_si128(a, b, 0x00);  // low * low
+  tmp[1] = _mm_clmulepi64_si128(a, b, 0x11);  // high * high
+  
+  __m128i mid0 = _mm_clmulepi64_si128(a, b, 0x01);  // low * high
+  __m128i mid1 = _mm_clmulepi64_si128(a, b, 0x10);  // high * low
+  
+  mid0 = _mm_xor_si128(mid0, mid1);
+  __m128i low_part = _mm_slli_si128(mid0, 8);
+  __m128i high_part = _mm_srli_si128(mid0, 8);
+  
+  tmp[0] = _mm_xor_si128(tmp[0], low_part);
+  tmp[1] = _mm_xor_si128(tmp[1], high_part);
+  
+  // Step 2: Reduction with polynomial x^128 + x^7 + x^2 + x + 1 (modulus = 0x87)
+  // This matches the original: BF_VALUE(lhs, 0) ^= (mask & bf128_modulus);
+  __m128i modulus = _mm_set_epi64x(0, 0x87);  // x^7 + x^2 + x + 1
+  
+  // Process high part (tmp[1]) to reduce it
+  __m128i t0 = _mm_clmulepi64_si128(tmp[1], modulus, 0x01);  // high_high * modulus
+  __m128i t1 = _mm_slli_si128(t0, 8);
+  __m128i t2 = _mm_srli_si128(t0, 8);
+  t2 = _mm_xor_si128(t2, tmp[1]);  // combine with original high part
+  
+  t0 = _mm_clmulepi64_si128(t2, modulus, 0x00);  // final reduction
+  __m128i result = _mm_xor_si128(tmp[0], t0);
+  result = _mm_xor_si128(result, t1);
+  
+  return (bf128_t)result;
+#else
+  // Original implementation (fallback)
   bf128_t result = bf128_and_64(lhs, bf128_bit_to_uint64_mask(rhs, 0));
   for (unsigned int idx = 1; idx != 128; ++idx) {
     const uint64_t mask = bf128_bit_to_uint64_mask(lhs, 128 - 1);
@@ -190,6 +231,7 @@ bf128_t bf128_mul(bf128_t lhs, bf128_t rhs) {
     result = bf128_add(result, bf128_and_64(lhs, bf128_bit_to_uint64_mask(rhs, idx)));
   }
   return result;
+#endif
 }
 
 bf128_t bf128_mul_64(bf128_t lhs, bf64_t rhs) {

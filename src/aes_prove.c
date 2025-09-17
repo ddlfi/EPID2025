@@ -28,7 +28,10 @@ bf128_t* column_to_row_major_and_shrink_V_128(uint8_t** v, unsigned int ell) {
     // new_v has \ell + \lambda rows and \lambda columns storing in row-major
     // order
     bf128_t* new_v = faest_aligned_alloc(BF128_ALIGN, ell * sizeof(bf128_t));
-    for (unsigned int row = 0; row != ell; ++row) {
+    
+    // Parallel processing of rows
+    #pragma omp parallel for schedule(static)
+    for (unsigned int row = 0; row < ell; ++row) {
         uint8_t new_row[BF128_NUM_BYTES] = {0};
         for (unsigned int column = 0; column != 128; ++column) {
             ptr_set_bit(new_row, ptr_get_bit(v[column], row), column);
