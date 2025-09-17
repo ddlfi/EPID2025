@@ -17,6 +17,7 @@ set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native -flto")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto")
 
 find_package(OpenSSL REQUIRED)
+find_package(OpenMP REQUIRED)
 
 if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-fcommon)
@@ -35,3 +36,4 @@ add_executable(cases_test ${PROJECT_SOURCES})
 
 target_link_libraries(cases_test PRIVATE sha3)
 target_link_libraries(cases_test PRIVATE OpenSSL::Crypto)
+target_link_libraries(cases_test PRIVATE OpenMP::OpenMP_CXX)

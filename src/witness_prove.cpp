@@ -488,7 +488,7 @@ void leave_prove_256(const uint8_t* w, const bf128_t* bf_v, bf128_t* a_0_vec,
                      bf128_t* a_1_vec, bf128_t* a_2_vec) {
     uint8_t* k = (uint8_t*)malloc((14 + 1) * 256 / 8);
     bf128_t* vk = (bf128_t*)faest_aligned_alloc(
-        BF128_ALIGN , sizeof(bf128_t) * ((14 + 1) * 256));
+        BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
 
     // w : t xor c || c || roundkeys || states (4736)
     rijnd_key_schedule_constraints_Mkey_0_256(w + 64, w + 32, bf_v + 512,
@@ -497,8 +497,10 @@ void leave_prove_256(const uint8_t* w, const bf128_t* bf_v, bf128_t* a_0_vec,
 
     uint8_t* in = (uint8_t*)malloc(32);
     uint8_t* out = (uint8_t*)malloc(32);
-    bf128_t* bf_in = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-    bf128_t* bf_out = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_in =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_out =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
 
     xor_u8_array(w, w + 256 / 8, in, 32);
     xor_u8_array(w + 4736 / 8, in, out, 32);
@@ -507,7 +509,6 @@ void leave_prove_256(const uint8_t* w, const bf128_t* bf_v, bf128_t* a_0_vec,
         bf_in[j] = bf128_add(bf_v[j], bf_v[256 + j]);
         bf_out[j] = bf128_add(bf_v[4736 + j], bf_in[j]);
     }
-    
 
     rijnd_enc_constraints_Mkey_0_256(in, out, w + (512 + 14 * 64) / 8,
                                      bf_v + 512 + 14 * 64, k, vk, bf_in, bf_out,
@@ -530,8 +531,10 @@ void leave_verify_256(const bf128_t* bf_q, const uint8_t* delta,
     rijnd_key_schedule_constraints_Mkey_1_256(bf_q + 512, bf_q + 256, delta,
                                               b_vec, qk);
 
-    bf128_t* bf_in = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-    bf128_t* bf_out = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_in =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_out =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
 
     for (int j = 0; j < 256; j++) {
         bf_in[j] = bf128_add(bf_q[j], bf_q[256 + j]);
@@ -557,8 +560,10 @@ void merkle_tree_prove_256(const uint8_t* w, const bf128_t* bf_v,
     uint8_t* in = (uint8_t*)malloc(256 / 8);
     uint8_t* out = (uint8_t*)malloc(256 / 8);
     bf128_t* origin_key_v = (bf128_t*)malloc(256 * sizeof(bf128_t));
-    bf128_t* bf_in = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-    bf128_t* bf_out = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_in =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_out =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
 
     for (int i = 0; i < height; i++) {
         xor_u8_array(w + MERKLE_TREE_256 * i / 8,
@@ -605,8 +610,10 @@ void merkle_tree_verify_256(const bf128_t* bf_q, const uint8_t* delta,
     bf128_t* qk = (bf128_t*)faest_aligned_alloc(
         BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
     bf128_t* origin_key_q = (bf128_t*)malloc(256 * sizeof(bf128_t));
-    bf128_t* bf_in = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
-    bf128_t* bf_out = (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_in =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
+    bf128_t* bf_out =
+        (bf128_t*)faest_aligned_alloc(BF128_ALIGN, 256 * sizeof(bf128_t));
 
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < 256; j++) {
@@ -689,26 +696,46 @@ void witness_verify_256(const bf128_t* bf_q, const uint8_t* delta,
     bf128_t* qk = (bf128_t*)faest_aligned_alloc(
         BF128_ALIGN, sizeof(bf128_t) * ((14 + 1) * 256));
 
+    // 1. 第一个验证步骤 - 必须先执行来初始化qk
     rijnd_verify_256(bf_q, delta, r, t, b_vec, true, qk, false, false);
     index += 256 + 14 * 64 + 13 * 256;
 
-    rijnd_verify_256(bf_q + index, delta, nullptr, nullptr, b_vec + 1120, false,
-                     qk, true, true);
-    index += 13 * 256 + 256;
+    // 预计算其他步骤的索引
+    unsigned int index_2 = index + 13 * 256 + 256;
+    unsigned int index_3 = index_2 + 256 + 14 * 64 + 13 * 256;
+    unsigned int index_4 =
+        index_3 + (256 * 3 + 256 + 14 * 64 + 256 * 13) * height + 256;
 
-    leave_verify_256(bf_q + (index - 256), delta, b_vec + 2016);
+// 2-5. 后面的步骤可以并行执行
+#pragma omp parallel sections
+    {
+#pragma omp section
+        {
+            // t_i_join验证
+            rijnd_verify_256(bf_q + index, delta, nullptr, nullptr,
+                             b_vec + 1120, false, qk, true, true);
+        }
 
-    index += 256 + 14 * 64 + 13 * 256;
+#pragma omp section
+        {
+            // x_i验证
+            leave_verify_256(bf_q + (index_2 - 256), delta, b_vec + 2016);
+        }
 
-    merkle_tree_verify_256(bf_q + index, delta, b_vec + 3136, height);
+#pragma omp section
+        {
+            // Merkle tree验证
+            merkle_tree_verify_256(bf_q + index_3, delta, b_vec + 3136, height);
+        }
 
-    index += (256 * 3 + 256 + 14 * 64 + 256 * 13) * height + 256;
-
-    // SRL verify
-    if (!srl.empty()) {
-        srl_verify_256(bf_q + index, delta, b_vec + 3136 + 1120 * height,
-        lambda,
-                       qk, srl);
+#pragma omp section
+        {
+            // SRL验证
+            if (!srl.empty()) {
+                srl_verify_256(bf_q + index_4, delta,
+                               b_vec + 3136 + 1120 * height, lambda, qk, srl);
+            }
+        }
     }
 
     faest_aligned_free(qk);

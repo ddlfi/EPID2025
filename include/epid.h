@@ -73,11 +73,19 @@ class epid {  // a class to simulate the sign / verify process of our EPID
         params_.tau1 = tau1;
         params_.tau = tau;
         member_num_ = member_num;
-        // init group
+        
+        skey_set.resize(member_num_);
+        challenge_set.resize(member_num_);
+        t_set.resize(member_num_);
+        x_set.resize(member_num_);
+        
         auto join_start = std::chrono::high_resolution_clock::now();
+        
+        #pragma omp parallel for
         for (int i = 0; i < member_num_; i++) {
-            issue_join();
+            issue_join_parallel(i);
         }
+        
         auto join_end = std::chrono::high_resolution_clock::now();
         std::cout << "issue_join loop time: "
                   << std::chrono::duration<double, std::milli>(join_end -
@@ -106,6 +114,7 @@ class epid {  // a class to simulate the sign / verify process of our EPID
     }
 
     void issue_join();
+    void issue_join_parallel(int index);
     void issue_rejoin();
 
     void epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,

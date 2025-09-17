@@ -135,7 +135,6 @@ bf128_t epid::zk_hash(const std::vector<uint8_t>& sd,
     return result;
 }
 
-
 void epid::gen_rootkey_iv(const std::vector<uint8_t>& mu, unsigned int index,
                           std::vector<uint8_t>& rootkey,
                           std::vector<uint8_t>& iv) {
@@ -217,50 +216,39 @@ void epid::gen_tree() {
     }
 }
 
+void epid::issue_join_parallel(int index) {
+    thread_local std::mt19937 local_rng(std::random_device{}() + index);
+    thread_local std::uniform_int_distribution<uint8_t> local_byte_dist(0, 255);
+
+    std::vector<uint8_t> sk(lambda_bytes_);
+    for (size_t i = 0; i < lambda_bytes_; ++i) {
+        sk[i] = local_byte_dist(local_rng);
+    }
+    skey_set[index] = std::move(sk);
+
+    std::vector<uint8_t> challenge(lambda_bytes_);
+    for (size_t i = 0; i < lambda_bytes_; ++i) {
+        challenge[i] = local_byte_dist(local_rng);
+    }
+    challenge_set[index] = std::move(challenge);
+
+    std::vector<uint8_t> t(lambda_bytes_);
+    hash_func_256(skey_set[index], challenge_set[index], t);
+    t_set[index] = std::move(t);
+
+    std::vector<uint8_t> x(lambda_bytes_);
+    hash_func_256(challenge_set[index], t_set[index], x);
+    x_set[index] = std::move(x);
+}
+
 void epid::issue_join() {
-    static double total_gen_sk_time = 0.0;
-    static double total_gen_challenge_time = 0.0;
-    static double total_cal_t_time = 0.0;
-    static double total_gen_x_time = 0.0;
-    static int call_count = 0;
-
-    // Timing gen_sk()
-    auto start_gen_sk = std::chrono::high_resolution_clock::now();
     gen_sk();
-    auto end_gen_sk = std::chrono::high_resolution_clock::now();
-    total_gen_sk_time += std::chrono::duration<double, std::milli>(end_gen_sk - start_gen_sk).count();
 
-    // Timing gen_challenge()
-    auto start_gen_challenge = std::chrono::high_resolution_clock::now();
     gen_challenge();
-    auto end_gen_challenge = std::chrono::high_resolution_clock::now();
-    total_gen_challenge_time += std::chrono::duration<double, std::milli>(end_gen_challenge - start_gen_challenge).count();
 
-    // Timing cal_t()
-    auto start_cal_t = std::chrono::high_resolution_clock::now();
     cal_t(skey_set[skey_set.size() - 1],
           challenge_set[challenge_set.size() - 1]);
-    auto end_cal_t = std::chrono::high_resolution_clock::now();
-    total_cal_t_time += std::chrono::duration<double, std::milli>(end_cal_t - start_cal_t).count();
-
-    // Timing gen_x()
-    auto start_gen_x = std::chrono::high_resolution_clock::now();
     gen_x();
-    auto end_gen_x = std::chrono::high_resolution_clock::now();
-    total_gen_x_time += std::chrono::duration<double, std::milli>(end_gen_x - start_gen_x).count();
-
-    call_count++;
-
-    // Print intermediate results every 10000 members
-    if (call_count % 10000 == 0) {
-        double total_time = total_gen_sk_time + total_gen_challenge_time + total_cal_t_time + total_gen_x_time;
-        std::cout << "\n=== After " << call_count << " members ===" << std::endl;
-        std::cout << "gen_sk(): " << (total_gen_sk_time/total_time*100) << "%" << std::endl;
-        std::cout << "gen_challenge(): " << (total_gen_challenge_time/total_time*100) << "%" << std::endl;
-        std::cout << "cal_t(): " << (total_cal_t_time/total_time*100) << "%" << std::endl;
-        std::cout << "gen_x(): " << (total_gen_x_time/total_time*100) << "%" << std::endl;
-        std::cout << "Total: " << total_time << " ms" << std::endl;
-    }
 }
 
 // Generate SRL (Signature Revocation List) with random revoked signatures
@@ -561,7 +549,8 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     sig->pdec.resize(params_.tau);
     sig->com.resize(params_.tau);
     hash_challenge_3(sig->chall_3, chall_2, A_0_tilde_bytes,
-                     sig->A_1_tilde_bytes, sig->A_2_tilde_bytes, params_.lambda);
+                     sig->A_1_tilde_bytes, sig->A_2_tilde_bytes,
+                     params_.lambda);
 
     for (unsigned int i = 0; i < params_.tau; i++) {
         // Step 20
@@ -681,7 +670,8 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     delete[] Dtilde[0];
 
     std::vector<uint8_t> chall_2(3 * params_.lambda_bytes + 8);
-    hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d, params_.lambda, ell);
+    hash_challenge_2(chall_2, chall_1, sig->u_tilde, h_v, sig->d,
+                     params_.lambda, ell);
 
     for (unsigned int i = 0, col = 0; i < params_.tau; i++) {
         unsigned int depth = i < params_.tau0 ? params_.k0 : params_.k1;
@@ -736,5 +726,6 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     delete[] Q[0];
     delete[] Q_[0];
     faest_aligned_free(bf_q);
-    return memcmp(chall_3.data(), sig->chall_3.data(), params_.lambda_bytes) == 0;
+    return memcmp(chall_3.data(), sig->chall_3.data(), params_.lambda_bytes) ==
+           0;
 }
