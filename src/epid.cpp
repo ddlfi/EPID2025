@@ -1,12 +1,13 @@
 #include "epid.h"
 
+#include <omp.h>
+
 #include <chrono>
 #include <cstdint>
 #include <random>
-#include <omp.h>
 
-#include "witness_prove.hpp"
 #include "vole_parallel.h"
+#include "witness_prove.hpp"
 
 // Global fast random number generator - initialized once
 static std::mt19937 global_rng(std::random_device{}());
@@ -120,11 +121,11 @@ bf128_t epid::zk_hash(const std::vector<uint8_t>& sd,
 
     bf128_t h_0 = bf128_zero();
     bf128_t h_1 = bf128_zero();
-    
+
     // Use simple serial computation - precomputation was too expensive
     bf128_t s_muti = s;
     bf128_t t_muti = t;
-    
+
     for (size_t i = 0; i < x_0.size(); ++i) {
         h_0 = bf128_add(h_0, bf128_mul(s_muti, x_0[i]));
         h_1 = bf128_add(h_1, bf128_mul(t_muti, x_0[i]));
@@ -135,7 +136,7 @@ bf128_t epid::zk_hash(const std::vector<uint8_t>& sd,
     bf128_t result = bf128_mul(r_0, h_0);
     result = bf128_add(result, bf128_mul(r_1, h_1));
     result = bf128_add(result, x_1);
-    
+
     return result;
 }
 
@@ -210,17 +211,17 @@ void epid::cal_t_256(const std::vector<uint8_t>& sk,
 void epid::gen_tree() {
     tree_ = std::vector<std::vector<uint8_t>>(
         2 * member_num_, std::vector<uint8_t>(lambda_bytes_));
-    
-    #pragma omp parallel for schedule(static)
+
+#pragma omp parallel for schedule(static)
     for (int i = member_num_; i < 2 * member_num_; i++) {
         tree_[i] = x_set[i - member_num_];
     }
-    
+
     for (int level = 1; level < log2(member_num_) + 1; level++) {
         int level_start = member_num_ >> level;
         int level_end = member_num_ >> (level - 1);
-        
-        #pragma omp parallel for schedule(static)
+
+#pragma omp parallel for schedule(static)
         for (int index = level_start; index < level_end; index++) {
             hash_func_256(tree_[2 * index], tree_[2 * index + 1], tree_[index]);
         }
@@ -264,28 +265,27 @@ void epid::issue_join() {
 
 // Generate SRL (Signature Revocation List) with random revoked signatures
 void epid::generate_srl(unsigned int srl_size) {
+    // Generate a random secret key (different from existing ones)
+    std::vector<uint8_t> random_sk(lambda_bytes_);
+    bool sk_unique;
+    do {
+        sk_unique = true;
+        for (auto& byte : random_sk) {
+            byte = byte_dist(global_rng);
+        }
+
+        // Check if it's different from existing secret keys
+        for (const auto& existing_sk : skey_set) {
+            if (std::equal(random_sk.begin(), random_sk.end(),
+                           existing_sk.begin())) {
+                sk_unique = false;
+                break;
+            }
+        }
+    } while (!sk_unique);
+
     for (unsigned int i = 0; i < srl_size; i++) {
         signature_t revoked_sig;
-
-        // Generate a random secret key (different from existing ones)
-        std::vector<uint8_t> random_sk(lambda_bytes_);
-        bool sk_unique;
-        do {
-            sk_unique = true;
-            for (auto& byte : random_sk) {
-                byte = byte_dist(global_rng);
-            }
-
-            // Check if it's different from existing secret keys
-            for (const auto& existing_sk : skey_set) {
-                if (std::equal(random_sk.begin(), random_sk.end(),
-                               existing_sk.begin())) {
-                    sk_unique = false;
-                    break;
-                }
-            }
-        } while (!sk_unique);
-
         revoked_sig.r.resize(lambda_bytes_);
         for (auto& byte : revoked_sig.r) {
             byte = byte_dist(global_rng);
@@ -305,28 +305,27 @@ void epid::generate_srl(unsigned int srl_size) {
 // Generate SRL (Signature Revocation List) with random revoked signatures for
 // 256-bit
 void epid::generate_srl_256(unsigned int srl_size) {
+    // Generate a random secret key (different from existing ones)
+    std::vector<uint8_t> random_sk(lambda_bytes_);
+    bool sk_unique;
+    do {
+        sk_unique = true;
+        for (auto& byte : random_sk) {
+            byte = byte_dist(global_rng);
+        }
+
+        // Check if it's different from existing secret keys
+        for (const auto& existing_sk : skey_set) {
+            if (std::equal(random_sk.begin(), random_sk.end(),
+                           existing_sk.begin())) {
+                sk_unique = false;
+                break;
+            }
+        }
+    } while (!sk_unique);
+
     for (unsigned int i = 0; i < srl_size; i++) {
         signature_t revoked_sig;
-
-        // Generate a random secret key (different from existing ones)
-        std::vector<uint8_t> random_sk(lambda_bytes_);
-        bool sk_unique;
-        do {
-            sk_unique = true;
-            for (auto& byte : random_sk) {
-                byte = byte_dist(global_rng);
-            }
-
-            // Check if it's different from existing secret keys
-            for (const auto& existing_sk : skey_set) {
-                if (std::equal(random_sk.begin(), random_sk.end(),
-                               existing_sk.begin())) {
-                    sk_unique = false;
-                    break;
-                }
-            }
-        } while (!sk_unique);
-
         revoked_sig.r.resize(lambda_bytes_);
         for (auto& byte : revoked_sig.r) {
             byte = byte_dist(global_rng);
@@ -418,18 +417,20 @@ static void or_extend_witness(uint8_t* witness, uint8_t* d,
 static void srl_extend_witness(std::vector<signature_t>& revoke_list,
                                std::vector<uint8_t>& sk, uint8_t* witness,
                                unsigned int lambda) {
-    // Parallel processing of SRL list - each entry works on independent memory regions
-    #pragma omp parallel for schedule(static)
+// Parallel processing of SRL list - each entry works on independent memory
+// regions
+#pragma omp parallel for schedule(static)
     for (size_t i = 0; i < revoke_list.size(); i++) {
         const auto& sig = revoke_list[i];
-        
+
         // Calculate the witness offset for this SRL entry
         uint8_t* current_witness = witness + i * ((14 * 256 + 256) / 8);
-        
+
         // Local buffer for this thread
         std::vector<uint8_t> d(lambda / 8);
-        
-        aes_extend_witness(sk.data(), sig.r.data(), current_witness, 0, 0, 1, lambda);
+
+        aes_extend_witness(sk.data(), sig.r.data(), current_witness, 0, 0, 1,
+                           lambda);
         xor_u8_array(current_witness + 14 * 256 / 8 - lambda / 8, sig.r.data(),
                      d.data(),
                      lambda / 8);  // rijndael out xor with input : f output
@@ -471,15 +472,16 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
 
     auto t1 = std::chrono::high_resolution_clock::now();
     sig->c.resize((params_.tau - 1) * ell_hat_bytes);
-    
+
     auto vole_detailed_start = std::chrono::high_resolution_clock::now();
     vole_commit_parallel(rootkey.data(), sig->iv.data(), ell_hat, &(params_),
-                        hcom.data(), vecCom.data(), sig->c.data(), u.data(), V.data());
+                         hcom.data(), vecCom.data(), sig->c.data(), u.data(),
+                         V.data());
     auto vole_detailed_end = std::chrono::high_resolution_clock::now();
-    
+
     auto t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] vole_commit: " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Sign] vole_commit: "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
     std::vector<uint8_t> chall_1(5 * params_.lambda_bytes + 8);
     hash_challenge_1(mu, hcom, sig->c, sig->iv, chall_1, ell, params_.tau);
@@ -495,20 +497,22 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
         for (auto& v : V_tilde_results) {
             v.resize(params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
-        
+
         auto vole_start = std::chrono::high_resolution_clock::now();
 
-        #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
         for (unsigned int i = 0; i < params_.lambda; ++i) {
             vole_hash(V_tilde_results[i].data(), chall_1.data(), V[i], ell,
                       params_.lambda);
         }
         auto vole_end = std::chrono::high_resolution_clock::now();
-        std::cout << "    [h_v] parallel vole_hash (" << params_.lambda 
-                  << " calls): " 
-                  << std::chrono::duration<double, std::milli>(vole_end - vole_start).count() 
+        std::cout << "    [h_v] parallel vole_hash (" << params_.lambda
+                  << " calls): "
+                  << std::chrono::duration<double, std::milli>(vole_end -
+                                                               vole_start)
+                         .count()
                   << " ms" << std::endl;
-        
+
         auto h1_start = std::chrono::high_resolution_clock::now();
         // 串行更新H1上下文
         H1_context_t h1_ctx_1;
@@ -519,13 +523,16 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
         }
         H1_final(&h1_ctx_1, h_v.data(), params_.lambda_bytes * 2);
         auto h1_end = std::chrono::high_resolution_clock::now();
-        std::cout << "    [h_v] H1_update/final: " 
-                  << std::chrono::duration<double, std::milli>(h1_end - h1_start).count() 
+        std::cout << "    [h_v] H1_update/final: "
+                  << std::chrono::duration<double, std::milli>(h1_end -
+                                                               h1_start)
+                         .count()
                   << " ms" << std::endl;
     }
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] h_v computation (" << params_.lambda << " vole_hash calls): " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Sign] h_v computation (" << params_.lambda
+              << " vole_hash calls): "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
     std::vector<uint8_t> witness(ell_bytes, 0);
     unsigned int index = 0;
@@ -552,8 +559,8 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
                        1, 1, 0, lambda_);
     index += 256 + 14 * 64 + 13 * 256;  // c_i_join + roundkeys + states
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] 3x aes_extend_witness calls: " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Sign] 3x aes_extend_witness calls: "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
 
     t1 = std::chrono::high_resolution_clock::now();
@@ -561,16 +568,18 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     gen_witness_merkle_tree(witness.data() + index / 8, signer_index);
     index += (256 * 3 + 256 + 14 * 64 + 256 * 13) * log2(member_num_) + 256;
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] gen_witness_merkle_tree (height=" << log2(member_num_) << "): " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Sign] gen_witness_merkle_tree (height=" << log2(member_num_)
+              << "): "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
 
     t1 = std::chrono::high_resolution_clock::now();
     srl_extend_witness(srl, skey_set[signer_index], witness.data() + index / 8,
                        lambda_);
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] srl_extend_witness (" << srl.size() << " SRL entries): " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Sign] srl_extend_witness (" << srl.size()
+              << " SRL entries): "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
 
     sig->d.resize(ell_bytes);
@@ -593,51 +602,52 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     std::vector<bf128_t> a_1_vec_test;
     a_0_vec_test.resize(multi_num);
     a_1_vec_test.resize(multi_num);
-    
+
     t1 = std::chrono::high_resolution_clock::now();
     bf128_t* bf_v = column_to_row_major_and_shrink_V_128(V.data(), ell_hat);
     auto t1_5 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] column_to_row_major_and_shrink_V_128: " 
-              << std::chrono::duration<double, std::milli>(t1_5 - t1).count() 
+    std::cout << "[Sign] column_to_row_major_and_shrink_V_128: "
+              << std::chrono::duration<double, std::milli>(t1_5 - t1).count()
               << " ms" << std::endl;
-    
+
     witness_prove_256(witness.data(), bf_v, a_0_vec.data(), a_1_vec.data(),
                       a_2_vec.data(), chall_2.data(), lambda_, sig->t.data(),
                       sig->r.data(), log2(member_num_), ell_hat, srl);
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] witness_prove_256: " 
-              << std::chrono::duration<double, std::milli>(t2 - t1_5).count() 
+    std::cout << "[Sign] witness_prove_256: "
+              << std::chrono::duration<double, std::milli>(t2 - t1_5).count()
               << " ms" << std::endl;
 
-    
     // ZK hash operations
     auto zk_start = std::chrono::high_resolution_clock::now();
     bf128_t u_0_mask = bf128_load(u.data() + ell_bytes);
     bf128_t u_1_mask = bf128_load(u.data() + ell_bytes + params_.lambda_bytes);
-    
+
     bf128_t a_0_tilde, a_1_tilde, a_2_tilde;
-    
-    #pragma omp parallel sections num_threads(3)
+
+#pragma omp parallel sections num_threads(3)
     {
-        #pragma omp section
+#pragma omp section
         {
             a_0_tilde = zk_hash(chall_2, a_0_vec, bf128_sum_poly(bf_v + ell));
         }
-        #pragma omp section
+#pragma omp section
         {
-            a_1_tilde = zk_hash(
-                chall_2, a_1_vec,
-                bf128_add(u_0_mask, bf128_sum_poly(bf_v + ell + params_.lambda)));
+            a_1_tilde =
+                zk_hash(chall_2, a_1_vec,
+                        bf128_add(u_0_mask,
+                                  bf128_sum_poly(bf_v + ell + params_.lambda)));
         }
-        #pragma omp section
+#pragma omp section
         {
             a_2_tilde = zk_hash(chall_2, a_2_vec, u_1_mask);
         }
     }
     auto zk_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] ZK hash operations (3 calls): " 
-              << std::chrono::duration<double, std::milli>(zk_end - zk_start).count() 
-              << " ms" << std::endl;
+    std::cout
+        << "[Sign] ZK hash operations (3 calls): "
+        << std::chrono::duration<double, std::milli>(zk_end - zk_start).count()
+        << " ms" << std::endl;
 
     bf128_store(A_0_tilde_bytes.data(), a_0_tilde);
     bf128_store(sig->A_1_tilde_bytes.data(), a_1_tilde);
@@ -645,14 +655,16 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     sig->chall_3.resize(params_.lambda_bytes);
     sig->pdec.resize(params_.tau);
     sig->com.resize(params_.tau);
-    
+
     auto hash3_start = std::chrono::high_resolution_clock::now();
     hash_challenge_3(sig->chall_3, chall_2, A_0_tilde_bytes,
                      sig->A_1_tilde_bytes, sig->A_2_tilde_bytes,
                      params_.lambda);
     auto hash3_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] hash_challenge_3: " 
-              << std::chrono::duration<double, std::milli>(hash3_end - hash3_start).count() 
+    std::cout << "[Sign] hash_challenge_3: "
+              << std::chrono::duration<double, std::milli>(hash3_end -
+                                                           hash3_start)
+                     .count()
               << " ms" << std::endl;
 
     auto vector_open_start = std::chrono::high_resolution_clock::now();
@@ -671,14 +683,20 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
         vec_com_clear(&vecCom[i]);
     }
     auto vector_open_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[Sign] vector_open operations (" << params_.tau << " iterations): " 
-              << std::chrono::duration<double, std::milli>(vector_open_end - vector_open_start).count() 
+    std::cout << "[Sign] vector_open operations (" << params_.tau
+              << " iterations): "
+              << std::chrono::duration<double, std::milli>(vector_open_end -
+                                                           vector_open_start)
+                     .count()
               << " ms" << std::endl;
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::cout << "=== EPID Sign Total Time: "
-              << std::chrono::duration<double, std::milli>(end_time - start_time).count()
-              << " ms ===\n" << std::endl;
+              << std::chrono::duration<double, std::milli>(end_time -
+                                                           start_time)
+                     .count()
+              << " ms ===\n"
+              << std::endl;
     delete[] V[0];
     faest_aligned_free(bf_v);
 }
@@ -695,10 +713,10 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     const unsigned int ell_hat =
         ell + params_.lambda * 3 + UNIVERSAL_HASH_B_BITS;
     const unsigned int ell_hat_bytes = ell_hat / 8;
-    
+
     auto start_time = std::chrono::high_resolution_clock::now();
     std::cout << "\n=== EPID Verify Performance Analysis ===" << std::endl;
-    
+
     std::vector<uint8_t> mu(2 * params_.lambda_bytes);
     hash_mu(msg, mu);
 
@@ -708,13 +726,14 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     for (unsigned int i = 1; i < params_.lambda; ++i) {
         Q[i] = Q[0] + i * ell_hat_bytes;
     }
-    
+
     auto t1 = std::chrono::high_resolution_clock::now();
-    vole_reconstruct_parallel(sig->iv.data(), sig->chall_3.data(), sig->pdec.data(),
-                               sig->com.data(), hcom.data(), Q.data(), ell_hat, &params_);
+    vole_reconstruct_parallel(sig->iv.data(), sig->chall_3.data(),
+                              sig->pdec.data(), sig->com.data(), hcom.data(),
+                              Q.data(), ell_hat, &params_);
     auto t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] vole_reconstruct: " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Verify] vole_reconstruct: "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
 
     std::vector<uint8_t> chall_1(5 * params_.lambda_bytes + 8);
@@ -768,8 +787,9 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
         }
     }
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] Q matrix processing (" << params_.tau << " iterations): " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Verify] Q matrix processing (" << params_.tau
+              << " iterations): "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
 
     t1 = std::chrono::high_resolution_clock::now();
@@ -779,22 +799,25 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
         for (auto& q : Q_tilde_results) {
             q.resize(params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
-        
+
         auto vole_start = std::chrono::high_resolution_clock::now();
 
-        #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
         for (unsigned int i = 0; i < params_.lambda; i++) {
             vole_hash(Q_tilde_results[i].data(), chall_1.data(), Q_[i], ell,
                       params_.lambda);
-            xor_u8_array(Q_tilde_results[i].data(), Dtilde[i], Q_tilde_results[i].data(),
+            xor_u8_array(Q_tilde_results[i].data(), Dtilde[i],
+                         Q_tilde_results[i].data(),
                          params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
         auto vole_end = std::chrono::high_resolution_clock::now();
-        std::cout << "    [h_v] parallel vole_hash+xor (" << params_.lambda 
-                  << " calls): " 
-                  << std::chrono::duration<double, std::milli>(vole_end - vole_start).count() 
+        std::cout << "    [h_v] parallel vole_hash+xor (" << params_.lambda
+                  << " calls): "
+                  << std::chrono::duration<double, std::milli>(vole_end -
+                                                               vole_start)
+                         .count()
                   << " ms" << std::endl;
-        
+
         auto h1_start = std::chrono::high_resolution_clock::now();
 
         H1_context_t h1_ctx_1;
@@ -805,14 +828,17 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
         }
         H1_final(&h1_ctx_1, h_v.data(), params_.lambda_bytes * 2);
         auto h1_end = std::chrono::high_resolution_clock::now();
-        std::cout << "    [h_v] H1_update/final: " 
-                  << std::chrono::duration<double, std::milli>(h1_end - h1_start).count() 
+        std::cout << "    [h_v] H1_update/final: "
+                  << std::chrono::duration<double, std::milli>(h1_end -
+                                                               h1_start)
+                         .count()
                   << " ms" << std::endl;
     }
     delete[] Dtilde[0];
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] h_v computation (" << params_.lambda << " vole_hash calls): " 
-              << std::chrono::duration<double, std::milli>(t2 - t1).count() 
+    std::cout << "[Verify] h_v computation (" << params_.lambda
+              << " vole_hash calls): "
+              << std::chrono::duration<double, std::milli>(t2 - t1).count()
               << " ms" << std::endl;
 
     std::vector<uint8_t> chall_2(3 * params_.lambda_bytes + 8);
@@ -835,20 +861,20 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
 
     std::vector<bf128_t> b_vec(multi_num);
     std::vector<bf128_t> b_vec_test(multi_num);
-    
+
     t1 = std::chrono::high_resolution_clock::now();
     bf128_t* bf_q = column_to_row_major_and_shrink_V_128(Q_.data(), ell_hat);
     auto t1_5 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] column_to_row_major_and_shrink_V_128: " 
-              << std::chrono::duration<double, std::milli>(t1_5 - t1).count() 
+    std::cout << "[Verify] column_to_row_major_and_shrink_V_128: "
+              << std::chrono::duration<double, std::milli>(t1_5 - t1).count()
               << " ms" << std::endl;
 
     witness_verify_256(bf_q, sig->chall_3.data(), b_vec.data(), lambda_,
                        sig->t.data(), sig->r.data(), log2(member_num_), ell_hat,
                        srl);
     t2 = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] witness_verify_256: " 
-              << std::chrono::duration<double, std::milli>(t2 - t1_5).count() 
+    std::cout << "[Verify] witness_verify_256: "
+              << std::chrono::duration<double, std::milli>(t2 - t1_5).count()
               << " ms" << std::endl;
 
     auto zk_verify_start = std::chrono::high_resolution_clock::now();
@@ -868,8 +894,10 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
 
     bf128_store(A_0_tilde_bytes.data(), a_0_tilde);
     auto zk_verify_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] ZK verification operations: " 
-              << std::chrono::duration<double, std::milli>(zk_verify_end - zk_verify_start).count() 
+    std::cout << "[Verify] ZK verification operations: "
+              << std::chrono::duration<double, std::milli>(zk_verify_end -
+                                                           zk_verify_start)
+                     .count()
               << " ms" << std::endl;
 
     std::vector<uint8_t> chall_3(params_.lambda_bytes);
@@ -878,14 +906,19 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     hash_challenge_3(chall_3, chall_2, A_0_tilde_bytes, sig->A_1_tilde_bytes,
                      sig->A_2_tilde_bytes, params_.lambda);
     auto final_hash_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[Verify] final hash_challenge_3: " 
-              << std::chrono::duration<double, std::milli>(final_hash_end - final_hash_start).count() 
+    std::cout << "[Verify] final hash_challenge_3: "
+              << std::chrono::duration<double, std::milli>(final_hash_end -
+                                                           final_hash_start)
+                     .count()
               << " ms" << std::endl;
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::cout << "=== EPID Verify Total Time: "
-              << std::chrono::duration<double, std::milli>(end_time - start_time).count()
-              << " ms ===\n" << std::endl;
+              << std::chrono::duration<double, std::milli>(end_time -
+                                                           start_time)
+                     .count()
+              << " ms ===\n"
+              << std::endl;
 
     delete[] Q[0];
     delete[] Q_[0];
