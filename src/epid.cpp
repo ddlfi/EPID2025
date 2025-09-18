@@ -13,35 +13,6 @@
 static std::mt19937 global_rng(std::random_device{}());
 static std::uniform_int_distribution<uint8_t> byte_dist(0, 255);
 
-void epid::init_member_data(int member_num) {
-    size_t total_size = (size_t)member_num * lambda_bytes_;
-    skey_data = std::make_unique<uint8_t[]>(total_size);
-    challenge_data = std::make_unique<uint8_t[]>(total_size);
-    t_data = std::make_unique<uint8_t[]>(total_size);
-    x_data = std::make_unique<uint8_t[]>(total_size);
-    
-    skey_set.clear();
-    challenge_set.clear();
-    t_set.clear();
-    x_set.clear();
-    
-    skey_set.reserve(member_num);
-    challenge_set.reserve(member_num);
-    t_set.reserve(member_num);
-    x_set.reserve(member_num);
-    
-    for (int i = 0; i < member_num; i++) {
-        skey_set.emplace_back(skey_data.get() + i * lambda_bytes_, 
-                             skey_data.get() + (i + 1) * lambda_bytes_);
-        challenge_set.emplace_back(challenge_data.get() + i * lambda_bytes_,
-                                  challenge_data.get() + (i + 1) * lambda_bytes_);
-        t_set.emplace_back(t_data.get() + i * lambda_bytes_,
-                          t_data.get() + (i + 1) * lambda_bytes_);
-        x_set.emplace_back(x_data.get() + i * lambda_bytes_,
-                          x_data.get() + (i + 1) * lambda_bytes_);
-    }
-}
-
 void hash_func(const std::vector<uint8_t>& m_1, const std::vector<uint8_t>& m_2,
                std::vector<uint8_t>& out) {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
@@ -238,12 +209,22 @@ void epid::cal_t_256(const std::vector<uint8_t>& sk,
 }
 
 void epid::gen_tree() {
-    tree_ = std::vector<std::vector<uint8_t>>(
-        2 * member_num_, std::vector<uint8_t>(lambda_bytes_));
+    // Use a single contiguous memory block instead of vector of vectors
+    size_t tree_size = 2 * member_num_;
+    std::unique_ptr<uint8_t[]> tree_data = std::make_unique<uint8_t[]>(tree_size * lambda_bytes_);
+    
+    tree_.clear();
+    tree_.reserve(tree_size);
+    
+    // Create vector wrappers pointing to the contiguous memory
+    for (size_t i = 0; i < tree_size; i++) {
+        tree_.emplace_back(tree_data.get() + i * lambda_bytes_,
+                          tree_data.get() + (i + 1) * lambda_bytes_);
+    }
 
 #pragma omp parallel for schedule(static)
     for (int i = member_num_; i < 2 * member_num_; i++) {
-        tree_[i] = x_set[i - member_num_];
+        std::copy(x_set[i - member_num_].begin(), x_set[i - member_num_].end(), tree_[i].begin());
     }
 
     for (int level = 1; level < log2(member_num_) + 1; level++) {
@@ -255,6 +236,9 @@ void epid::gen_tree() {
             hash_func_256(tree_[2 * index], tree_[2 * index + 1], tree_[index]);
         }
     }
+    
+    // Keep the tree_data alive by storing it in a static variable
+    static std::unique_ptr<uint8_t[]> persistent_tree_data = std::move(tree_data);
 }
 
 void epid::issue_join_parallel(int index) {

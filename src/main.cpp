@@ -103,7 +103,7 @@ int main() {
 
     // Run performance test with 10 iterations
     std::cout << "\n=== Performance Test ===" << std::endl;
-    performance_test(msg, 128, 8, 8, 0, 16, 16, 1024, 100, 10);
+    performance_test(msg, 128, 8, 8, 0, 16, 16, 1024 * 1024*4, 100, 10);
 
     return 0;
 }
