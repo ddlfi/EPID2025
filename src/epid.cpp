@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <random>
+#include <omp.h>
 
 #include "witness_prove.hpp"
 #include "vole_parallel.h"
@@ -209,13 +210,20 @@ void epid::cal_t_256(const std::vector<uint8_t>& sk,
 void epid::gen_tree() {
     tree_ = std::vector<std::vector<uint8_t>>(
         2 * member_num_, std::vector<uint8_t>(lambda_bytes_));
+    
+    #pragma omp parallel for schedule(static)
     for (int i = member_num_; i < 2 * member_num_; i++) {
         tree_[i] = x_set[i - member_num_];
     }
-    int index = member_num_ - 1;
-    while (index != 0) {
-        hash_func_256(tree_[2 * index], tree_[2 * index + 1], tree_[index]);
-        index--;
+    
+    for (int level = 1; level < log2(member_num_) + 1; level++) {
+        int level_start = member_num_ >> level;
+        int level_end = member_num_ >> (level - 1);
+        
+        #pragma omp parallel for schedule(static)
+        for (int index = level_start; index < level_end; index++) {
+            hash_func_256(tree_[2 * index], tree_[2 * index + 1], tree_[index]);
+        }
     }
 }
 
@@ -464,7 +472,6 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     auto t1 = std::chrono::high_resolution_clock::now();
     sig->c.resize((params_.tau - 1) * ell_hat_bytes);
     
-    // 添加VOLE内部时间测量
     auto vole_detailed_start = std::chrono::high_resolution_clock::now();
     vole_commit_parallel(rootkey.data(), sig->iv.data(), ell_hat, &(params_),
                         hcom.data(), vecCom.data(), sig->c.data(), u.data(), V.data());
@@ -484,14 +491,13 @@ void epid::epid_sign(const std::vector<uint8_t>& msg, signature_t* sig,
     t1 = std::chrono::high_resolution_clock::now();
     std::vector<uint8_t> h_v(params_.lambda_bytes * 2);
     {
-        // 为并行计算分配存储空间
         std::vector<std::vector<uint8_t>> V_tilde_results(params_.lambda);
         for (auto& v : V_tilde_results) {
             v.resize(params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
         
         auto vole_start = std::chrono::high_resolution_clock::now();
-        // 并行计算所有vole_hash调用
+
         #pragma omp parallel for schedule(static)
         for (unsigned int i = 0; i < params_.lambda; ++i) {
             vole_hash(V_tilde_results[i].data(), chall_1.data(), V[i], ell,
@@ -769,14 +775,13 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
     t1 = std::chrono::high_resolution_clock::now();
     std::vector<uint8_t> h_v(params_.lambda_bytes * 2);
     {
-        // 为并行计算分配存储空间
         std::vector<std::vector<uint8_t>> Q_tilde_results(params_.lambda);
         for (auto& q : Q_tilde_results) {
             q.resize(params_.lambda_bytes + UNIVERSAL_HASH_B);
         }
         
         auto vole_start = std::chrono::high_resolution_clock::now();
-        // 并行计算所有vole_hash和xor操作
+
         #pragma omp parallel for schedule(static)
         for (unsigned int i = 0; i < params_.lambda; i++) {
             vole_hash(Q_tilde_results[i].data(), chall_1.data(), Q_[i], ell,
@@ -791,7 +796,7 @@ bool epid::epid_verify(const std::vector<uint8_t>& msg,
                   << " ms" << std::endl;
         
         auto h1_start = std::chrono::high_resolution_clock::now();
-        // 串行更新H1上下文
+
         H1_context_t h1_ctx_1;
         H1_init(&h1_ctx_1, params_.lambda);
         for (unsigned int i = 0; i < params_.lambda; i++) {
