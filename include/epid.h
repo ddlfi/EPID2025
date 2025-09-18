@@ -2,6 +2,7 @@
 #include <openssl/evp.h>
 
 #include <chrono>
+#include <memory>
 
 #include "aes.h"
 #include "aes_prove.h"
@@ -74,10 +75,7 @@ class epid {  // a class to simulate the sign / verify process of our EPID
         params_.tau = tau;
         member_num_ = member_num;
         
-        skey_set.resize(member_num_);
-        challenge_set.resize(member_num_);
-        t_set.resize(member_num_);
-        x_set.resize(member_num_);
+        init_member_data(member_num_);
         
         auto join_start = std::chrono::high_resolution_clock::now();
         
@@ -175,12 +173,18 @@ class epid {  // a class to simulate the sign / verify process of our EPID
 
     void generate_srl_256(unsigned int srl_size);
 
+    void init_member_data(int member_num);
+
    private:
     int ell_ = 0;
     int member_num_ = 0;
     paramset_t params_;
 
     std::vector<std::vector<uint8_t>> tree_;
+    std::unique_ptr<uint8_t[]> skey_data;
+    std::unique_ptr<uint8_t[]> challenge_data;
+    std::unique_ptr<uint8_t[]> t_data;
+    std::unique_ptr<uint8_t[]> x_data;
     std::vector<std::vector<uint8_t>> skey_set;
     std::vector<std::vector<uint8_t>> challenge_set;
     std::vector<std::vector<uint8_t>> t_set;

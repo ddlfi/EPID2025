@@ -13,6 +13,35 @@
 static std::mt19937 global_rng(std::random_device{}());
 static std::uniform_int_distribution<uint8_t> byte_dist(0, 255);
 
+void epid::init_member_data(int member_num) {
+    size_t total_size = (size_t)member_num * lambda_bytes_;
+    skey_data = std::make_unique<uint8_t[]>(total_size);
+    challenge_data = std::make_unique<uint8_t[]>(total_size);
+    t_data = std::make_unique<uint8_t[]>(total_size);
+    x_data = std::make_unique<uint8_t[]>(total_size);
+    
+    skey_set.clear();
+    challenge_set.clear();
+    t_set.clear();
+    x_set.clear();
+    
+    skey_set.reserve(member_num);
+    challenge_set.reserve(member_num);
+    t_set.reserve(member_num);
+    x_set.reserve(member_num);
+    
+    for (int i = 0; i < member_num; i++) {
+        skey_set.emplace_back(skey_data.get() + i * lambda_bytes_, 
+                             skey_data.get() + (i + 1) * lambda_bytes_);
+        challenge_set.emplace_back(challenge_data.get() + i * lambda_bytes_,
+                                  challenge_data.get() + (i + 1) * lambda_bytes_);
+        t_set.emplace_back(t_data.get() + i * lambda_bytes_,
+                          t_data.get() + (i + 1) * lambda_bytes_);
+        x_set.emplace_back(x_data.get() + i * lambda_bytes_,
+                          x_data.get() + (i + 1) * lambda_bytes_);
+    }
+}
+
 void hash_func(const std::vector<uint8_t>& m_1, const std::vector<uint8_t>& m_2,
                std::vector<uint8_t>& out) {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
