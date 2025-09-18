@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.cpp": "cpp",
         "array": "cpp",
         "cstdlib": "cpp",
         "vector": "cpp",
@@ -80,7 +81,8 @@
         "evp.h": "c",
         "parameters.h": "c",
         "aes_prove.h": "c",
-        "endian_compat.h": "c"
+        "endian_compat.h": "c",
+        "emmintrin.h": "c"
     },
     "C_Cpp.errorSquiggles": "enabled",
     "C_Cpp.intelliSenseEngine": "default",

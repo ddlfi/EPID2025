@@ -8,12 +8,47 @@
 #include "compat.h"
 #include "macros.h"
 
+#ifdef __AVX2__
+#include <immintrin.h>
+#elif defined(__SSE2__)
+#include <emmintrin.h>
+#endif
+
 FAEST_BEGIN_C_DECL
 
 static inline void xor_u8_array(const uint8_t* a, const uint8_t* b, uint8_t* out, size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    out[i] = a[i] ^ b[i];
-  }
+#ifdef __AVX2__
+    // Process 32 bytes at a time with AVX2
+    size_t simd_len = len & ~31;
+    for (size_t i = 0; i < simd_len; i += 32) {
+        __m256i va = _mm256_loadu_si256((const __m256i*)(a + i));
+        __m256i vb = _mm256_loadu_si256((const __m256i*)(b + i));
+        __m256i result = _mm256_xor_si256(va, vb);
+        _mm256_storeu_si256((__m256i*)(out + i), result);
+    }
+    // Handle remaining bytes
+    for (size_t i = simd_len; i < len; i++) {
+        out[i] = a[i] ^ b[i];
+    }
+#elif defined(__SSE2__)
+    // Process 16 bytes at a time with SSE2
+    size_t simd_len = len & ~15;
+    for (size_t i = 0; i < simd_len; i += 16) {
+        __m128i va = _mm_loadu_si128((const __m128i*)(a + i));
+        __m128i vb = _mm_loadu_si128((const __m128i*)(b + i));
+        __m128i result = _mm_xor_si128(va, vb);
+        _mm_storeu_si128((__m128i*)(out + i), result);
+    }
+    // Handle remaining bytes
+    for (size_t i = simd_len; i < len; i++) {
+        out[i] = a[i] ^ b[i];
+    }
+#else
+    // Fallback to scalar implementation
+    for (size_t i = 0; i < len; i++) {
+        out[i] = a[i] ^ b[i];
+    }
+#endif
 }
 
 static inline void masked_xor_u8_array(const uint8_t* a, const uint8_t* b, uint8_t* out,

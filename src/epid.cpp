@@ -410,16 +410,23 @@ static void or_extend_witness(uint8_t* witness, uint8_t* d,
 static void srl_extend_witness(std::vector<signature_t>& revoke_list,
                                std::vector<uint8_t>& sk, uint8_t* witness,
                                unsigned int lambda) {
-    bool flag = 0;
-    std::vector<uint8_t> d(lambda / 8);
-    for (auto& sig : revoke_list) {
-        aes_extend_witness(sk.data(), sig.r.data(), witness, 0, 0, 1, lambda);
-        xor_u8_array(witness + 14 * 256 / 8 - lambda / 8, sig.r.data(),
+    // Parallel processing of SRL list - each entry works on independent memory regions
+    #pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < revoke_list.size(); i++) {
+        const auto& sig = revoke_list[i];
+        
+        // Calculate the witness offset for this SRL entry
+        uint8_t* current_witness = witness + i * ((14 * 256 + 256) / 8);
+        
+        // Local buffer for this thread
+        std::vector<uint8_t> d(lambda / 8);
+        
+        aes_extend_witness(sk.data(), sig.r.data(), current_witness, 0, 0, 1, lambda);
+        xor_u8_array(current_witness + 14 * 256 / 8 - lambda / 8, sig.r.data(),
                      d.data(),
                      lambda / 8);  // rijndael out xor with input : f output
         xor_u8_array(d.data(), sig.t.data(), d.data(), lambda / 8);
-        or_extend_witness(witness + 14 * 256 / 8, d.data(), lambda);
-        witness += (14 * 256 + 256) / 8;
+        or_extend_witness(current_witness + 14 * 256 / 8, d.data(), lambda);
     }
 }
 

@@ -6,8 +6,11 @@
 #include <config.h>
 #endif
 
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdbool.h>
 #include <string.h>
+#include <omp.h>
 
 #include "aes.h"
 #include "random_oracle.h"
@@ -37,11 +40,29 @@
     if (!sd0_bot) {
         prg(sd, iv, R(0, 0), lambda, outLenBytes);
     }
-    // Step: 3..4
-    for (unsigned int i = 1; i < num_instances; i++) {
-        prg(sd + (lambda_bytes * i), iv, R(0, i), lambda, outLenBytes);
+    
+    // Step: 3..4 - PRG loop optimization with intelligent threading
+    int available_threads = omp_get_max_threads();
+    if (available_threads >= 8 && num_instances > 64) {
+        // Use nested parallelism only if we have enough threads and work
+        int inner_threads = available_threads / 4;  // Conservative allocation
+        if (inner_threads > 8) inner_threads = 8;   // Cap at 8 threads
+        
+        int old_nested = omp_get_nested();
+        omp_set_nested(1);
+        #pragma omp parallel for schedule(static) num_threads(inner_threads)
+        for (unsigned int i = 1; i < num_instances; i++) {
+            prg(sd + (lambda_bytes * i), iv, R(0, i), lambda, outLenBytes);
+        }
+        omp_set_nested(old_nested);
+    } else {
+        // Fallback to simple loop for low-thread systems
+        for (unsigned int i = 1; i < num_instances; i++) {
+            prg(sd + (lambda_bytes * i), iv, R(0, i), lambda, outLenBytes);
+        }
     }
-    // Step: 5..9
+    
+    // Step: 5..9 - XOR tree computation
     memset(v, 0, depth * outLenBytes);
     for (unsigned int j = 0; j < depth; j++) {
         unsigned int depthloop = num_instances >> (j + 1);
@@ -51,10 +72,12 @@
                          outLenBytes);
         }
     }
+    
     // Step: 10
     if (!sd0_bot && u != NULL) {
         memcpy(u, R(depth, 0), outLenBytes);
     }
+    
     free(r);
 }
 
